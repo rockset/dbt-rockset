@@ -2,3 +2,6 @@
 *.pyo
 __pycache__/
 .DS_Store
+build/
+dbt_rockset.egg-info/
+dist/

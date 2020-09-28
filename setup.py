@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from setuptools import find_packages
-from setuptools import setup
+from distutils.core import setup
 
 package_name = "dbt-rockset"
 package_version = "0.0.1"
@@ -22,7 +22,7 @@ setup(
         ]
     },
     install_requires=[
-        "dbt-core==0.16.1rc1",
-        "rockset",
+        "dbt-core>=0.18",
+        "rockset>=0.7",
     ]
 )
