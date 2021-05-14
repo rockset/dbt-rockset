@@ -1,7 +1,3 @@
-{% macro rockset__create_table_as(temporary, relation, sql) -%}
-  {{ adapter.create_table(relation, sql) }}
-{% endmacro %}
-
 {% materialization table, adapter='rockset' -%}
   {%- set identifier = model['alias'] -%}
   {%- set old_relation = adapter.get_relation(database=database, schema=schema, identifier=identifier) -%}
@@ -14,8 +10,11 @@
       {{ adapter.drop_relation(old_relation) }}
   {%- endif -%}
 
+  {{ adapter.create_table(target_relation, sql) }}
+
+  {#-- Rockset does not support CREATE TABLE sql. All logic to create collections happens in create_table_as --#}
   {% call statement('main') -%}
-    {{ create_table_as(False, target_relation, sql) }}
+    {{ "SELECT 1" }}
   {%- endcall %}
 
   {{ run_hooks(post_hooks) }}

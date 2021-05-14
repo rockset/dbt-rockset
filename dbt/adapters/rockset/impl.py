@@ -190,19 +190,13 @@ class RocksetAdapter(BaseAdapter):
         self._wait_until_collection_ready(relation.identifier, relation.schema)
 
         # Execute the given sql and parse the results
-        cursor = self._rs_cursor()
-        cursor.execute(sql)
-        field_names = self._description_to_field_names(cursor.description)
-        json_results = []
-        for row in cursor.fetchall():
-            json_results.append(self._row_to_json(row, field_names))
+        json_results = self._json_results_from_sql(sql)
+        self._strip_internal_fields(json_results)
 
         # Write the results to the newly created table and wait until the docs are ingested
         expected_doc_count = len(json_results)
         c.add_docs(json_results)
         self._wait_until_docs(relation.identifier, relation.schema, expected_doc_count)
-
-        return "SELECT 1"
 
     @available.parse(lambda *a, **k: '')
     def create_view(self, relation, sql):
@@ -210,11 +204,39 @@ class RocksetAdapter(BaseAdapter):
             'Rockset does not yet support views!'
         )
 
+    @available.parse(lambda *a, **k: '')
+    def add_incremental_docs(self, relation, sql, unique_key):
+
+        # Execute the provided sql and fetch results
+        json_results = self._json_results_from_sql(sql)
+
+        # TODO: Uncomment the two lines below to support using the unique_key. It works as expected,
+        # but the only thing we can't do is wait until all the new docs are ingested, bc we can't
+        # depend on final doc count when there are overrides and we have no way of knowing when the
+        # overrides complete
+        if unique_key:
+            # self._update_ids_using_unique_key(json_results, unique_key, relation)
+            # self._strip_internal_fields(json_results, keep_id=True)
+            raise dbt.exceptions.NotImplementedException(
+                '`unique_key` not yet supported for the Rockset adapter!'
+            )
+        else:
+            c = self._rs_client().Collection.retrieve(
+                relation.identifier,
+                workspace=relation.schema
+            )
+            initial_doc_count = c.describe()['data']['stats']['doc_count']
+
+            self._strip_internal_fields(json_results)
+            expected_doc_count = initial_doc_count + len(json_results)
+
+         # Write the docs to the created table and wait until they are ingested
+        c.add_docs(json_results)
+        self._wait_until_docs(relation.identifier, relation.schema, expected_doc_count)    
+
     ###
     # Internal Rockset helper methods
     ###
-
-    fields_to_drop = set(['_event_time', '_id'])
 
     def _rs_client(self):
         return self.connections.get_thread_connection().handle._client()
@@ -281,10 +303,42 @@ class RocksetAdapter(BaseAdapter):
     def _description_to_field_names(self, description):
         return [desc[0] for desc in description]
 
+    def _json_results_from_sql(self, sql):
+        cursor = self._rs_cursor()
+        cursor.execute(sql)
+        field_names = self._description_to_field_names(cursor.description)
+        json_results = []
+        for row in cursor.fetchall():
+            json_results.append(self._row_to_json(row, field_names))
+        return json_results
+
+    def _strip_internal_fields(self, json_results, keep_id=False):
+        fields_to_drop = ['_event_time', '_meta']
+
+        if not keep_id:
+            fields_to_drop.append('_id')
+
+        for res in json_results:
+            for field in fields_to_drop:
+                res.pop(field, None)
+
     def _row_to_json(self, row, field_names):
         json_res = {}
         for i in range(len(row)):
-            if field_names[i] in self.fields_to_drop:
-                continue
             json_res[field_names[i]] = row[i]
         return json_res
+
+    def _update_ids_using_unique_key(self, json_results, unique_key, target_relation):
+        sql = f'SELECT * FROM {target_relation.schema}.{target_relation.identifier}'
+        target_collection_docs = self._json_results_from_sql(sql)
+
+        unique_key_val_to_id = {}
+        for doc in target_collection_docs:
+            if unique_key in doc:
+                unique_key_val = str(doc[unique_key])
+                unique_key_val_to_id[unique_key_val] = doc['_id']
+
+        for res in json_results:
+            if unique_key in res and str(res[unique_key]) in unique_key_val_to_id:
+                res['_id'] = unique_key_val_to_id[str(res[unique_key])]
+        
