@@ -7,3 +7,7 @@
     FROM {{ relation }}
   {%- endcall %}
 {% endmacro %}
+
+-- Rockset does not have a notion of database, so do not include it when resolving refs from other models
+-- It resolves as schema.identifier (i.e. workspace.collection), instead of database.schema.identifier
+{% macro ref(modelname) %}{{ builtins.ref(modelname).include(database=False).render() }}{% endmacro %}
