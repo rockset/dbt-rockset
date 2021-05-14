@@ -1,1 +1,0 @@
-SELECT * from commons._events LIMIT 10;

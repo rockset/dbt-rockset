@@ -24,8 +24,6 @@ class RocksetCredentials(Credentials):
     def _connection_keys(self):
         return ('api_server', 'workspace', 'schema', 'database')
 
-    # TODO This should work, but it doesn't. dbt says field `schema` is still required
-    # in profiles.yml
     _ALIASES = {
         'workspace': 'schema'
     }
@@ -51,8 +49,6 @@ class RocksetConnectionManager(BaseConnectionManager):
             connection.state = 'open'
             connection.handle = handle
         except Exception as e:
-            print("CAUGHT EXCEPTION")
-            print(e)
             connection.state = 'fail'
             connection.handle = None
         return connection
@@ -105,18 +101,6 @@ class RocksetConnectionManager(BaseConnectionManager):
             yield
         except Exception as e:
             raise e
-        # "module 'rockset' has no attribute 'sql'" with code below
-
-        # except rockset.sql.ProgrammingError as e:
-        #     logger.debug('Invalid user request: {}'.format(str(e)))
-        #     raise dbt.exceptions.CompilationException(str(e))
-        # except rockset.sql.NotSupportedError as exc:
-        #     logger.debug('Feature not yet implemented: {}'.format(str(e)))
-        #     raise dbt.exceptions.CompilationException(str(e))
-        # except (rockset.sql.OperationalError,
-        #     rockset.sql.InternalError) as e:
-        #     logger.debug("Error running SQL: {}".format(sql))
-        #     raise dbt.exceptions.DatabaseException(str(e))
 
     @classmethod
     def get_response(cls, cursor):
