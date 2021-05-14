@@ -18,6 +18,7 @@ setup(
     package_data={
         'dbt': [
             'include/rockset/macros/*.sql',
+            'include/rockset/macros/**/*.sql',
             'include/rockset/dbt_project.yml',
         ]
     },

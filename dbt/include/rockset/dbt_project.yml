@@ -2,5 +2,10 @@
 name: dbt_rockset
 version: 1.0
 config-version: 2
-
+profile: rockset
 macro-paths: ["macros"]
+
+models:
+  test_model:
+    # Applies to all files under models/example/
+    materialized: view
