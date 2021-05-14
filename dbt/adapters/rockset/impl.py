@@ -11,7 +11,6 @@ import dbt
 from time import sleep
 from typing import List
 
-# TODO TRY IMPLEMENTING BaseAdapter! This is what BigQuery does :shrug:
 class RocksetAdapter(BaseAdapter):
     RELATION_TYPES = {
         'TABLE': RelationType.Table,
