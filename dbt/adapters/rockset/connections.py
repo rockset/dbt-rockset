@@ -2,6 +2,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from dbt.adapters.base import Credentials
 from dbt.adapters.base import BaseConnectionManager
+from dbt.adapters.rockset.util import sql_to_json_results
 from dbt.clients import agate_helper
 from dbt.contracts.connection import AdapterResponse, Connection
 
@@ -34,6 +35,7 @@ class RocksetConnectionManager(BaseConnectionManager):
 
     @classmethod
     def open(cls, connection: Connection) -> Connection:
+        print(f'Opening connection to Rockset')
         if connection.state == 'open':
             logger.debug('Connection is already open, skipping open.')
             return connection
@@ -77,7 +79,7 @@ class RocksetConnectionManager(BaseConnectionManager):
 
     # Rockset does not implement transactions
     def clear_transaction(self) -> None:
-        pass
+        print(f'Clearing transaction')
 
     # auto_begin is ignored in Rockset, and only included for consistency
     def execute(
@@ -85,11 +87,13 @@ class RocksetConnectionManager(BaseConnectionManager):
     ) -> Tuple[Union[AdapterResponse, str], agate.Table]:
         sql = self._add_query_comment(sql)
         cursor = self.get_thread_connection().handle.cursor()
-        cursor.execute(sql)
 
+        print("Executing sql: " + sql)
         if fetch:
-            table = self.get_table_from_response(cursor.fetchall())
+            json_results = sql_to_json_results(cursor, sql)
+            table = agate.Table.from_object(json_results)
         else:
+            cursor.execute(sql)
             table = agate_helper.empty_table()
 
         return AdapterResponse(_message='OK'), table
@@ -105,9 +109,3 @@ class RocksetConnectionManager(BaseConnectionManager):
     @classmethod
     def get_response(cls, cursor):
         return 'OK'
-
-    @classmethod
-    def get_table_from_response(cls, resp):
-        raise dbt.exceptions.NotImplementedException(
-            '`get_table_from_response` not yet implemented. See BigQuery for example'
-        )

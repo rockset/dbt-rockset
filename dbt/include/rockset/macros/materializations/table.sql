@@ -10,6 +10,7 @@
       {{ adapter.drop_relation(old_relation) }}
   {%- endif -%}
 
+  {{ log('Calling create table for materialization type table') }}
   {{ adapter.create_table(target_relation, sql) }}
 
   {#-- Rockset does not support CREATE TABLE sql. All logic to create collections happens in create_table_as --#}
