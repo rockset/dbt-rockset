@@ -5,9 +5,11 @@ from dbt.adapters.sql import SQLAdapter
 from dbt.adapters.rockset.connections import RocksetConnectionManager
 from dbt.adapters.rockset.relation import RocksetRelation
 from dbt.adapters.rockset.column import RocksetColumn
+from dbt.adapters.rockset.util import sql_to_json_results
 
 import agate
 import dbt
+import json
 from time import sleep
 from typing import List
 
@@ -68,11 +70,30 @@ class RocksetAdapter(BaseAdapter):
     def drop_schema(self, relation: RocksetRelation) -> None:
         rs = self._rs_client()
         print('Dropping workspace "{}"', relation.schema)
-        ws = rs.Workspace.retrieve(relation.schema)
-        ws.drop()
+        try:
+            # Drop all collections in the ws
+            for collection in rs.Collection.list(workspace=relation.schema):
+                collection.drop()
+
+            # Wait until the ws has 0 collections
+            while True:
+                workspace = rs.Workspace.retrieve(relation.schema)
+                if workspace.collection_count == 0:
+                    break
+                print(f'Waiting for ws {relation.schema} to have 0 collections, has {workspace.collection_count}')
+                sleep(5)
+
+            # Now delete the workspace
+            rs.Workspace.delete(relation.schema)
+        except Exception as e:
+            if e.code == 404 and e.type == 'NotFound': # Workspace does not exist
+                return None
+            else: # Unexpected error
+                raise e
 
     @available.parse(lambda *a, **k: False)
     def check_schema_exists(self, database: str, schema: str) -> bool:
+        print(f'Checking if schema {schema} exists')
         rs = self._rs_client()
         try:
             _ = rs.Workspace.retrieve(schema)
@@ -84,6 +105,7 @@ class RocksetAdapter(BaseAdapter):
 
     @available
     def list_schemas(self, database: str) -> List[str]:
+        print(f'Listing schemas')
         rs = self._rs_client()
         return [ws.name for ws in rs.Workspace.list()]
 
@@ -95,6 +117,7 @@ class RocksetAdapter(BaseAdapter):
 
     @available.parse_list
     def drop_relation(self, relation: RocksetRelation) -> None:
+        print(f'Dropping relation {relation.schema}.{relation.identifier}')
         rs = self._rs_client()
         rs.Collection.retrieve(
             relation.identifier,
@@ -113,6 +136,7 @@ class RocksetAdapter(BaseAdapter):
     def get_relation(
             self, database: str, schema: str, identifier: str
         ) -> RocksetRelation:
+        print(f'Getting relation {schema}.{identifier}')
         try:
             rs = self._rs_client()
             collection = rs.Collection.retrieve(identifier, workspace=schema)
@@ -126,6 +150,7 @@ class RocksetAdapter(BaseAdapter):
     def list_relations_without_caching(
         self, schema_relation: RocksetRelation
     ) -> List[RocksetRelation]:
+        print(f'Listing relations without caching')
         # get Rockset client to use Rockset's Python API
         rs = self._rs_client()
         if schema_relation and schema_relation.identifier and schema_relation.schema:
@@ -147,6 +172,7 @@ class RocksetAdapter(BaseAdapter):
     def get_columns_in_relation(
         self, relation: RocksetRelation
     ) -> List[RocksetColumn]:
+        print(f'Getting columns in relation {relation.identifer}')
         sql = 'DESCRIBE "{}"."{}"'.format(relation.schema, relation.identifier)
         status, table = self.connections.execute(sql, fetch=True)
 
@@ -179,8 +205,35 @@ class RocksetAdapter(BaseAdapter):
     ###
     # Special Rockset implementations
     ###
+
+    # Used to create seed tables
+    @available.parse_none
+    def load_dataframe(self, database, schema, table_name, agate_table,
+                       column_override):
+        # Translate the agate table in json docs
+        json_results = []
+        for row in agate_table.rows:
+            d = dict(row.dict())
+            for k, v in d.items():
+                d[k] = str(v)
+            json_results.append(d)
+
+        # Create the Rockset collection
+        rs = self._rs_client()
+        c = rs.Collection.create(
+            table_name,
+            workspace=schema
+        )
+        self._wait_until_collection_ready(table_name, schema)
+
+        # Write the results to the collection and wait until the docs are ingested
+        expected_doc_count = len(json_results)
+        c.add_docs(json_results)
+        self._wait_until_docs(table_name, schema, expected_doc_count)
+
     @available.parse(lambda *a, **k: '')
     def create_table(self, relation, sql):
+        print(f'Creating table {relation.schema}.{relation.identifier}')
         rs = self._rs_client()
         
         c = rs.Collection.create(
@@ -190,7 +243,8 @@ class RocksetAdapter(BaseAdapter):
         self._wait_until_collection_ready(relation.identifier, relation.schema)
 
         # Execute the given sql and parse the results
-        json_results = self._json_results_from_sql(sql)
+        print(f'Using sql {sql} to create table')
+        json_results = sql_to_json_results(self._rs_cursor(), sql)
         self._strip_internal_fields(json_results)
 
         # Write the results to the newly created table and wait until the docs are ingested
@@ -206,9 +260,10 @@ class RocksetAdapter(BaseAdapter):
 
     @available.parse(lambda *a, **k: '')
     def add_incremental_docs(self, relation, sql, unique_key):
+        print(f'Adding incremental docs to {relation.schema}.{relation.identifier}')
 
         # Execute the provided sql and fetch results
-        json_results = self._json_results_from_sql(sql)
+        json_results = sql_to_json_results(self._rs_cursor(), sql)
 
         # TODO: Uncomment the two lines below to support using the unique_key. It works as expected,
         # but the only thing we can't do is wait until all the new docs are ingested, bc we can't
@@ -300,18 +355,6 @@ class RocksetAdapter(BaseAdapter):
             quote_policy=quote_policy
         )
 
-    def _description_to_field_names(self, description):
-        return [desc[0] for desc in description]
-
-    def _json_results_from_sql(self, sql):
-        cursor = self._rs_cursor()
-        cursor.execute(sql)
-        field_names = self._description_to_field_names(cursor.description)
-        json_results = []
-        for row in cursor.fetchall():
-            json_results.append(self._row_to_json(row, field_names))
-        return json_results
-
     def _strip_internal_fields(self, json_results, keep_id=False):
         fields_to_drop = ['_event_time', '_meta']
 
@@ -322,15 +365,9 @@ class RocksetAdapter(BaseAdapter):
             for field in fields_to_drop:
                 res.pop(field, None)
 
-    def _row_to_json(self, row, field_names):
-        json_res = {}
-        for i in range(len(row)):
-            json_res[field_names[i]] = row[i]
-        return json_res
-
     def _update_ids_using_unique_key(self, json_results, unique_key, target_relation):
         sql = f'SELECT * FROM {target_relation.schema}.{target_relation.identifier}'
-        target_collection_docs = self._json_results_from_sql(sql)
+        target_collection_docs = sql_to_json_results(self._rs_cursor(), sql)
 
         unique_key_val_to_id = {}
         for doc in target_collection_docs:
