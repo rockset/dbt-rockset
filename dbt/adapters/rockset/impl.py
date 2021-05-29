@@ -10,6 +10,7 @@ from dbt.adapters.rockset.util import sql_to_json_results
 import agate
 import dbt
 import json
+import os
 from time import sleep, time
 from typing import List
 
@@ -281,13 +282,11 @@ class RocksetAdapter(BaseAdapter):
         if not integration['s3']:
             raise dbt.exceptions.CompilationException('Integration must be S3 type')
         bucket = options['bucket']
-        prefix = options['prefix'] if 'prefix' in options else None
-        pattern = options['pattern'] if 'pattern' in options else None
 
-        if prefix and pattern:
-            raise dbt.exceptions.CompilationException('Can not specify both prefix and pattern, pick one')
-        elif not prefix and not pattern:
-            prefix = ''
+        prefix_key = 'ROCKSET_S3_STAGE_PREFIX'
+        if prefix_key not in os.environ:
+            raise Exception(f'Must provide {prefix_key} as an env variable')
+        prefix = os.environ[prefix_key]
 
         # The alias that points to the collection uses the identifer name, the collection
         # uses the identifer with a timestamp
@@ -298,7 +297,6 @@ class RocksetAdapter(BaseAdapter):
         s3 = rs.Source.s3(
             bucket=bucket,
             prefix=prefix,
-            pattern=pattern,
             integration=integration,
             format_params=format_params
         )
