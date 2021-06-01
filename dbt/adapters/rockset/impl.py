@@ -305,8 +305,9 @@ class RocksetAdapter(BaseAdapter):
         self._wait_until_collection_ready(cname, schema)
 
         # By default, wait 5 minutes after dump
-        wait_seconds_after_dump = options['wait_seconds_after_dump'] if 'wait_seconds_after_dump' in options else 300
-        self._wait_until_ingest_complete(rs, cname, schema, wait_seconds_after_dump)
+        wait_seconds_before_switch = options['wait_seconds_before_switch'] if 'wait_seconds_before_switch' in options else 300
+        print(f'Waiting {wait_seconds_before_switch} seconds before switching the alias to the new collection')
+        sleep(wait_seconds_before_switch)
 
         collection_path = schema + '.' + cname
         try:
@@ -453,38 +454,6 @@ class RocksetAdapter(BaseAdapter):
         for res in json_results:
             if unique_key in res and str(res[unique_key]) in unique_key_val_to_id:
                 res['_id'] = unique_key_val_to_id[str(res[unique_key])]
-
-    # Unfortunately, this is more of an art than a science. We use the following criteria:
-    #   1) Describe the collection until all sources show initial_dump_done = true
-    #   2) Wait 5 minutes. We need to define better Rockset APIs that can make one more
-    #      confident that a collection has all data
-    def _wait_until_ingest_complete(self, rs, cname, ws, wait_seconds_after_dump):
-        while True:
-            sleep(5)
-
-            try:
-                c = rs.Collection.retrieve(cname, workspace=ws)
-                sources = c.describe()['data']['sources']
-
-                # There should only be one source, and it should be S3
-                assert len(sources) == 1 and sources[0]['s3']
-                status = sources[0]['status']
-                if False: # not status['initial_dump_done']:
-                    print(f'Waiting for initial source dump of {ws}.{cname} to complete')
-                    continue
-
-                # Initial source dump is complete. Wait a bit to ensure that the collection
-                # has time to index all data
-                print(f'Waiting {wait_seconds_after_dump} seconds now that dump has completed')
-                sleep(wait_seconds_after_dump)
-                break
-            except Exception as e:
-                print(e)
-                # Getting the collection may throw not found at first
-                if e.code == 404 and e.type == 'NotFound':
-                    continue
-                else: # Unexpected error
-                    raise e
 
     def _drop_collection(self, rs, cname, ws):
         try:
