@@ -316,8 +316,8 @@ class RocksetAdapter(BaseAdapter):
             collections_to_drop = alias.collections
             alias.update(collections=[collection_path])
 
-            # Wait 5 minutes before dropping the old collections, to be sure the alias has switched over
-            # TODO sleep(300)
+            # Wait 2 minutes before dropping the old collections, to be sure the alias has switched over
+            sleep(120)
 
             for collection_path in collections_to_drop:
                 dropping_ws, dropping_cname = collection_path.split('.')
