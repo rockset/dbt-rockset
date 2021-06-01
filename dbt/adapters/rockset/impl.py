@@ -10,7 +10,8 @@ from dbt.adapters.rockset.util import sql_to_json_results
 import agate
 import dbt
 import json
-from time import sleep
+import os
+from time import sleep, time
 from typing import List
 
 class RocksetAdapter(BaseAdapter):
@@ -259,6 +260,80 @@ class RocksetAdapter(BaseAdapter):
         )
 
     @available.parse(lambda *a, **k: '')
+    def create_table_from_external(self, schema, identifier, options):
+        if not options:
+            raise dbt.exceptions.CompilationException('Must provide options')
+
+        if 'integration_name' not in options or 'bucket' not in options:
+            raise dbt.exceptions.CompilationException('Must provide `integration_name` and `bucket` in options')
+        iname = options['integration_name']
+        rs = self._rs_client()
+
+        # First, create the workspace if it doesn't exist
+        try:
+            rs.Workspace.retrieve(schema)
+        except Exception as e:
+            if e.code == 404 and e.type == 'NotFound':
+                rs.Workspace.create(schema)
+            else: # Unexpected error
+                raise e
+
+        integration = rs.Integration.retrieve(iname)
+        if not integration['s3']:
+            raise dbt.exceptions.CompilationException('Integration must be S3 type')
+        bucket = options['bucket']
+
+        prefix_key = 'ROCKSET_S3_STAGE_PREFIX'
+        if prefix_key not in os.environ:
+            raise Exception(f'Must provide {prefix_key} as an env variable')
+        prefix = os.environ[prefix_key]
+
+        # The alias that points to the collection uses the identifer name, the collection
+        # uses the identifer with a timestamp
+        alias_name = identifier
+        cname = identifier + '_' + str(int(round(time())))
+
+        format_params = options['format_params'] if 'format_params' in options else None
+        s3 = rs.Source.s3(
+            bucket=bucket,
+            prefix=prefix,
+            integration=integration,
+            format_params=format_params
+        )
+
+        newcoll = rs.Collection.create(name=cname, workspace=schema, sources=[s3])
+        self._wait_until_collection_ready(cname, schema)
+
+        # By default, wait 5 minutes after dump
+        wait_seconds_after_dump = options['wait_seconds_after_dump'] if 'wait_seconds_after_dump' in options else 300
+        self._wait_until_ingest_complete(rs, cname, schema, wait_seconds_after_dump)
+
+        collection_path = schema + '.' + cname
+        try:
+            alias = rs.Alias.retrieve(alias_name, workspace=schema)
+
+            # If the alias is found, point it to the new collection and delete the old collection
+            collections_to_drop = alias.collections
+            alias.update(collections=[collection_path])
+
+            # Wait 5 minutes before dropping the old collections, to be sure the alias has switched over
+            # TODO sleep(300)
+
+            for collection_path in collections_to_drop:
+                dropping_ws, dropping_cname = collection_path.split('.')
+                self._drop_collection(rs, dropping_cname, dropping_ws)
+        except Exception as e:
+            print(e)
+            # If not found, create it and point it to the collection
+            if e.code == 404 and e.type == 'NotFound':
+                rs.Alias.create(
+                    alias_name,
+                    workspace=schema,
+                    collections=[collection_path])
+            else: # Unexpected error
+                raise e
+
+    @available.parse(lambda *a, **k: '')
     def add_incremental_docs(self, relation, sql, unique_key):
         print(f'Adding incremental docs to {relation.schema}.{relation.identifier}')
 
@@ -378,4 +453,44 @@ class RocksetAdapter(BaseAdapter):
         for res in json_results:
             if unique_key in res and str(res[unique_key]) in unique_key_val_to_id:
                 res['_id'] = unique_key_val_to_id[str(res[unique_key])]
-        
+
+    # Unfortunately, this is more of an art than a science. We use the following criteria:
+    #   1) Describe the collection until all sources show initial_dump_done = true
+    #   2) Wait 5 minutes. We need to define better Rockset APIs that can make one more
+    #      confident that a collection has all data
+    def _wait_until_ingest_complete(self, rs, cname, ws, wait_seconds_after_dump):
+        while True:
+            sleep(5)
+
+            try:
+                c = rs.Collection.retrieve(cname, workspace=ws)
+                sources = c.describe()['data']['sources']
+
+                # There should only be one source, and it should be S3
+                assert len(sources) == 1 and sources[0]['s3']
+                status = sources[0]['status']
+                if False: # not status['initial_dump_done']:
+                    print(f'Waiting for initial source dump of {ws}.{cname} to complete')
+                    continue
+
+                # Initial source dump is complete. Wait a bit to ensure that the collection
+                # has time to index all data
+                print(f'Waiting {wait_seconds_after_dump} seconds now that dump has completed')
+                sleep(wait_seconds_after_dump)
+                break
+            except Exception as e:
+                print(e)
+                # Getting the collection may throw not found at first
+                if e.code == 404 and e.type == 'NotFound':
+                    continue
+                else: # Unexpected error
+                    raise e
+
+    def _drop_collection(self, rs, cname, ws):
+        try:
+            c = rs.Collection.retrieve(cname, workspace=ws)
+            c.drop()
+        except Exception as e:
+            print(e)
+            if e.code != 404 or e.type != 'NotFound':
+                raise e # Unexpected error
