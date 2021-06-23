@@ -88,7 +88,6 @@ class RocksetConnectionManager(BaseConnectionManager):
         sql = self._add_query_comment(sql)
         cursor = self.get_thread_connection().handle.cursor()
 
-        print("Executing sql: " + sql)
         if fetch:
             json_results = sql_to_json_results(cursor, sql)
             table = agate.Table.from_object(json_results)

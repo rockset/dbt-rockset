@@ -207,7 +207,7 @@ class RocksetAdapter(BaseAdapter):
     # Special Rockset implementations
     ###
 
-    # Used to create seed tables
+    # Used to create seed tables for testing
     @available.parse_none
     def load_dataframe(self, database, schema, table_name, agate_table,
                        column_override):
@@ -232,6 +232,7 @@ class RocksetAdapter(BaseAdapter):
         c.add_docs(json_results)
         self._wait_until_docs(table_name, schema, expected_doc_count)
 
+    # Table materialization
     @available.parse(lambda *a, **k: '')
     def create_table(self, relation, sql):
         print(f'Creating table {relation.schema}.{relation.identifier}')
@@ -243,14 +244,17 @@ class RocksetAdapter(BaseAdapter):
         )
         self._wait_until_collection_ready(relation.identifier, relation.schema)
 
-        # Execute the given sql and parse the results
-        print(f'Using sql {sql} to create table')
-        json_results = sql_to_json_results(self._rs_cursor(), sql)
-        self._strip_internal_fields(json_results)
+        # Get the expected row count, so we can wait until all docs are ingested
+        cursor = self._rs_cursor()
+        cursor.execute(sql)
+        expected_doc_count = cursor.rowcount
 
-        # Write the results to the newly created table and wait until the docs are ingested
-        expected_doc_count = len(json_results)
-        c.add_docs(json_results)
+        # Run an INSERT INTO statement and wait for the expected doc count
+        insert_into_sql = f'''
+            INSERT INTO {relation.schema}.{relation.identifier}
+            {sql}
+        '''
+        cursor.execute(insert_into_sql)
         self._wait_until_docs(relation.identifier, relation.schema, expected_doc_count)
 
     @available.parse(lambda *a, **k: '')
@@ -336,34 +340,42 @@ class RocksetAdapter(BaseAdapter):
 
     @available.parse(lambda *a, **k: '')
     def add_incremental_docs(self, relation, sql, unique_key):
-        print(f'Adding incremental docs to {relation.schema}.{relation.identifier}')
+        raise dbt.exceptions.NotImplementedException(
+            'Rockset does not yet support incremental materializations!'
+        )
 
-        # Execute the provided sql and fetch results
-        json_results = sql_to_json_results(self._rs_cursor(), sql)
+        # The code below *kind of* implements incremental materializations, but I'm commenting it
+        # out for now until it is better understood and tested
 
-        # TODO: Uncomment the two lines below to support using the unique_key. It works as expected,
-        # but the only thing we can't do is wait until all the new docs are ingested, bc we can't
-        # depend on final doc count when there are overrides and we have no way of knowing when the
-        # overrides complete
-        if unique_key:
-            # self._update_ids_using_unique_key(json_results, unique_key, relation)
-            # self._strip_internal_fields(json_results, keep_id=True)
-            raise dbt.exceptions.NotImplementedException(
-                '`unique_key` not yet supported for the Rockset adapter!'
-            )
-        else:
-            c = self._rs_client().Collection.retrieve(
-                relation.identifier,
-                workspace=relation.schema
-            )
-            initial_doc_count = c.describe()['data']['stats']['doc_count']
 
-            self._strip_internal_fields(json_results)
-            expected_doc_count = initial_doc_count + len(json_results)
+        # print(f'Adding incremental docs to {relation.schema}.{relation.identifier}')
 
-         # Write the docs to the created table and wait until they are ingested
-        c.add_docs(json_results)
-        self._wait_until_docs(relation.identifier, relation.schema, expected_doc_count)    
+        # # Execute the provided sql and fetch results
+        # json_results = sql_to_json_results(self._rs_cursor(), sql)
+
+        # # TODO: Uncomment the two lines below to support using the unique_key. It works as expected,
+        # # but the only thing we can't do is wait until all the new docs are ingested, bc we can't
+        # # depend on final doc count when there are overrides and we have no way of knowing when the
+        # # overrides complete
+        # if unique_key:
+        #     # self._update_ids_using_unique_key(json_results, unique_key, relation)
+        #     # self._strip_internal_fields(json_results, keep_id=True)
+        #     raise dbt.exceptions.NotImplementedException(
+        #         '`unique_key` not yet supported for the Rockset adapter!'
+        #     )
+        # else:
+        #     c = self._rs_client().Collection.retrieve(
+        #         relation.identifier,
+        #         workspace=relation.schema
+        #     )
+        #     initial_doc_count = c.describe()['data']['stats']['doc_count']
+
+        #     self._strip_internal_fields(json_results)
+        #     expected_doc_count = initial_doc_count + len(json_results)
+
+        #  # Write the docs to the created table and wait until they are ingested
+        # c.add_docs(json_results)
+        # self._wait_until_docs(relation.identifier, relation.schema, expected_doc_count)
 
     ###
     # Internal Rockset helper methods
