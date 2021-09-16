@@ -5,6 +5,7 @@ from dbt.adapters.base import BaseConnectionManager
 from dbt.adapters.rockset.util import sql_to_json_results
 from dbt.clients import agate_helper
 from dbt.contracts.connection import AdapterResponse, Connection
+from dbt.logger import GLOBAL_LOGGER as logger
 
 import agate
 import dbt
@@ -35,7 +36,7 @@ class RocksetConnectionManager(BaseConnectionManager):
 
     @classmethod
     def open(cls, connection: Connection) -> Connection:
-        print(f'Opening connection to Rockset')
+        logger.info(f'Opening connection to Rockset')
         if connection.state == 'open':
             logger.debug('Connection is already open, skipping open.')
             return connection
@@ -79,7 +80,7 @@ class RocksetConnectionManager(BaseConnectionManager):
 
     # Rockset does not implement transactions
     def clear_transaction(self) -> None:
-        print(f'Clearing transaction')
+        logger.info(f'Clearing transaction')
 
     # auto_begin is ignored in Rockset, and only included for consistency
     def execute(

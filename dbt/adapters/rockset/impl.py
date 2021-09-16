@@ -6,6 +6,7 @@ from dbt.adapters.rockset.connections import RocksetConnectionManager
 from dbt.adapters.rockset.relation import RocksetRelation
 from dbt.adapters.rockset.column import RocksetColumn
 from dbt.adapters.rockset.util import sql_to_json_results
+from dbt.logger import GLOBAL_LOGGER as logger
 
 import agate
 import dbt
@@ -65,12 +66,12 @@ class RocksetAdapter(BaseAdapter):
     # Schema/workspace related methods
     def create_schema(self, relation: RocksetRelation) -> None:
         rs = self._rs_client()
-        print('Creating workspace "{}"', relation.schema)
+        logger.info('Creating workspace "{}"', relation.schema)
         rs.Workspace.create(relation.schema)
 
     def drop_schema(self, relation: RocksetRelation) -> None:
         rs = self._rs_client()
-        print('Dropping workspace "{}"', relation.schema)
+        logger.info('Dropping workspace "{}"', relation.schema)
         try:
             # Drop all collections in the ws
             for collection in rs.Collection.list(workspace=relation.schema):
@@ -81,7 +82,7 @@ class RocksetAdapter(BaseAdapter):
                 workspace = rs.Workspace.retrieve(relation.schema)
                 if workspace.collection_count == 0:
                     break
-                print(f'Waiting for ws {relation.schema} to have 0 collections, has {workspace.collection_count}')
+                logger.info(f'Waiting for ws {relation.schema} to have 0 collections, has {workspace.collection_count}')
                 sleep(5)
 
             # Now delete the workspace
@@ -94,7 +95,7 @@ class RocksetAdapter(BaseAdapter):
 
     @available.parse(lambda *a, **k: False)
     def check_schema_exists(self, database: str, schema: str) -> bool:
-        print(f'Checking if schema {schema} exists')
+        logger.info(f'Checking if schema {schema} exists')
         rs = self._rs_client()
         try:
             _ = rs.Workspace.retrieve(schema)
@@ -106,7 +107,7 @@ class RocksetAdapter(BaseAdapter):
 
     @available
     def list_schemas(self, database: str) -> List[str]:
-        print(f'Listing schemas')
+        logger.info(f'Listing schemas')
         rs = self._rs_client()
         return [ws.name for ws in rs.Workspace.list()]
 
@@ -118,7 +119,7 @@ class RocksetAdapter(BaseAdapter):
 
     @available.parse_list
     def drop_relation(self, relation: RocksetRelation) -> None:
-        print(f'Dropping relation {relation.schema}.{relation.identifier}')
+        logger.info(f'Dropping relation {relation.schema}.{relation.identifier}')
         rs = self._rs_client()
         rs.Collection.retrieve(
             relation.identifier,
@@ -137,7 +138,7 @@ class RocksetAdapter(BaseAdapter):
     def get_relation(
             self, database: str, schema: str, identifier: str
         ) -> RocksetRelation:
-        print(f'Getting relation {schema}.{identifier}')
+        logger.info(f'Getting relation {schema}.{identifier}')
         try:
             rs = self._rs_client()
             collection = rs.Collection.retrieve(identifier, workspace=schema)
@@ -151,7 +152,7 @@ class RocksetAdapter(BaseAdapter):
     def list_relations_without_caching(
         self, schema_relation: RocksetRelation
     ) -> List[RocksetRelation]:
-        print(f'Listing relations without caching')
+        logger.info(f'Listing relations without caching')
         # get Rockset client to use Rockset's Python API
         rs = self._rs_client()
         if schema_relation and schema_relation.identifier and schema_relation.schema:
@@ -173,7 +174,7 @@ class RocksetAdapter(BaseAdapter):
     def get_columns_in_relation(
         self, relation: RocksetRelation
     ) -> List[RocksetColumn]:
-        print(f'Getting columns in relation {relation.identifer}')
+        logger.info(f'Getting columns in relation {relation.identifier}')
         sql = 'DESCRIBE "{}"."{}"'.format(relation.schema, relation.identifier)
         status, table = self.connections.execute(sql, fetch=True)
 
@@ -232,17 +233,29 @@ class RocksetAdapter(BaseAdapter):
         c.add_docs(json_results)
         self._wait_until_docs(table_name, schema, expected_doc_count)
 
+    def _create_alias(self, rs, alias, cpath):
+        logger.info(f'Creating alias {alias} on collection {cpath}')
+        rs.Alias.create(
+            name=alias,
+            workspace=cpath.split('.')[0],
+            collections=[cpath]
+        )
+
     # Table materialization
     @available.parse(lambda *a, **k: '')
     def create_table(self, relation, sql):
-        print(f'Creating table {relation.schema}.{relation.identifier}')
+        current_millis = round(time() * 1000)
+        cname_new = f'{relation.identifier}_{current_millis}'
+        cpath = f'{relation.schema}.{cname_new}'
+
+        logger.info(f'Creating collection {relation.schema}.{cname_new}')
         rs = self._rs_client()
-        
+
         c = rs.Collection.create(
-            relation.identifier,
+            cname_new,
             workspace=relation.schema
         )
-        self._wait_until_collection_ready(relation.identifier, relation.schema)
+        self._wait_until_collection_ready(cname_new, relation.schema)
 
         # Get the expected row count, so we can wait until all docs are ingested
         cursor = self._rs_cursor()
@@ -251,11 +264,37 @@ class RocksetAdapter(BaseAdapter):
 
         # Run an INSERT INTO statement and wait for the expected doc count
         insert_into_sql = f'''
-            INSERT INTO {relation.schema}.{relation.identifier}
+            INSERT INTO {relation.schema}.{cname_new}
             {sql}
         '''
         cursor.execute(insert_into_sql)
-        self._wait_until_docs(relation.identifier, relation.schema, expected_doc_count)
+        self._wait_until_docs(cname_new, relation.schema, expected_doc_count)
+
+        # Now we have a timestamp tagged table. Make sure that an alias named
+        # relation.identifier is pointing to it
+        alias_name = relation.identifier
+
+        try:
+            alias = rs.Alias.retrieve(alias_name, workspace=relation.schema)
+
+            old_collections = alias.collections
+            alias.update(collections=[cpath])
+
+            # Drop any collections previously referenced by the alias
+            for collection in old_collections:
+                try:
+                    ws, cname = collection.split('.')
+                    rs.Collection.retrieve(
+                        cname,
+                        workspace=ws
+                    ).drop()
+                except Exception as e:
+                    logger.warn(f'Failed to drop {ws}.{cname}. Continuing...')
+        except Exception as e:
+            if e.code == 404:
+                self._create_alias(rs, alias_name, cpath)
+            else:
+                raise e
 
     @available.parse(lambda *a, **k: '')
     def create_view(self, relation, sql):
@@ -292,8 +331,8 @@ class RocksetAdapter(BaseAdapter):
             raise Exception(f'Must provide {prefix_key} as an env variable')
         prefix = os.environ[prefix_key]
 
-        # The alias that points to the collection uses the identifer name, the collection
-        # uses the identifer with a timestamp
+        # The alias that points to the collection uses the identifier name, the collection
+        # uses the identifier with a timestamp
         alias_name = identifier
         cname = identifier + '_' + str(int(round(time())))
 
@@ -310,7 +349,7 @@ class RocksetAdapter(BaseAdapter):
 
         # By default, wait 5 minutes after dump
         wait_seconds_before_switch = options['wait_seconds_before_switch'] if 'wait_seconds_before_switch' in options else 300
-        print(f'Waiting {wait_seconds_before_switch} seconds before switching the alias to the new collection')
+        logger.info(f'Waiting {wait_seconds_before_switch} seconds before switching the alias to the new collection')
         sleep(wait_seconds_before_switch)
 
         collection_path = schema + '.' + cname
@@ -328,7 +367,7 @@ class RocksetAdapter(BaseAdapter):
                 dropping_ws, dropping_cname = collection_path.split('.')
                 self._drop_collection(rs, dropping_cname, dropping_ws)
         except Exception as e:
-            print(e)
+            logger.info(e)
             # If not found, create it and point it to the collection
             if e.code == 404 and e.type == 'NotFound':
                 rs.Alias.create(
@@ -348,7 +387,7 @@ class RocksetAdapter(BaseAdapter):
         # out for now until it is better understood and tested
 
 
-        # print(f'Adding incremental docs to {relation.schema}.{relation.identifier}')
+        # logger.info(f'Adding incremental docs to {relation.schema}.{relation.identifier}')
 
         # # Execute the provided sql and fetch results
         # json_results = sql_to_json_results(self._rs_cursor(), sql)
@@ -391,7 +430,7 @@ class RocksetAdapter(BaseAdapter):
         while True:
             try:
                 c = self._rs_client().Collection.retrieve(cname, workspace=ws)
-                print(f'Waiting for collection {ws}.{cname} to be deleted...')
+                logger.info(f'Waiting for collection {ws}.{cname} to be deleted...')
                 sleep(5)
             except Exception as e:
                 if e.code == 404 and e.type == 'NotFound': # Collection does not exist
@@ -405,10 +444,10 @@ class RocksetAdapter(BaseAdapter):
                 workspace=ws
             )
             if c.describe().data['status'] == 'READY':
-                print(f'{ws}.{cname} is ready!')
+                logger.info(f'{ws}.{cname} is ready!')
                 return
             else:
-                print(f'Waiting for collection {ws}.{cname} to become ready...')
+                logger.info(f'Waiting for collection {ws}.{cname} to become ready...')
                 sleep(5)
 
     def _wait_until_docs(self, cname, ws, doc_count):
@@ -419,10 +458,10 @@ class RocksetAdapter(BaseAdapter):
             )
             actual_count = c.describe().data['stats']['doc_count']
             if actual_count == doc_count:
-                print(f'{ws}.{cname} has {doc_count} docs!')
+                logger.info(f'{ws}.{cname} has {doc_count} docs!')
                 return
             else:
-                print(f'Waiting for collection {ws}.{cname} to have {doc_count} docs, it has {actual_count}...')
+                logger.info(f'Waiting for collection {ws}.{cname} to have {doc_count} docs, it has {actual_count}...')
                 sleep(5)
 
     def _rs_collection_to_relation(self, collection):
@@ -472,6 +511,6 @@ class RocksetAdapter(BaseAdapter):
             c = rs.Collection.retrieve(cname, workspace=ws)
             c.drop()
         except Exception as e:
-            print(e)
+            logger.info(e)
             if e.code != 404 or e.type != 'NotFound':
                 raise e # Unexpected error
