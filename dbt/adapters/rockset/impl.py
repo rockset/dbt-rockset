@@ -13,6 +13,7 @@ import dbt
 import json
 import os
 import requests
+import rockset
 from time import sleep, time
 from typing import List
 
@@ -304,10 +305,8 @@ class RocksetAdapter(BaseAdapter):
         headers = {"authorization": f'apikey {self._rs_api_key()}'}
 
         if type == 'GET':
-            print(f'getting url {url}')
             return requests.get(url, headers=headers)
         elif type == 'POST':
-            print(f'posting url {url}')
             return requests.post(url, headers=headers, json=body)
         else:
             raise Exception(f'Unimplemented request type {type}')
@@ -318,35 +317,49 @@ class RocksetAdapter(BaseAdapter):
     def _does_view_exist(self, ws, view):
         endpoint = self._views_endpoint(ws) + f'/{view}'
         response = self._send_rs_request('GET', endpoint)
-        print(f'get response text: {response.text}')
         if response.status_code == 404:
-            print(f'view {ws}.{view} does NOT exist')
             return False
         elif response.status_code == 200:
-            print(f'view {ws}.{view} DOES exist')
             return True
         else:
             raise Exception(response.text)
 
-    def _create_view(self, ws, view, sql):
-        print("CREATE VIEW")
-        # Check if alias exists. If it does, delete it
+    def _does_alias_exist(self, ws, alias):
         rs = self._rs_client()
         try:
-            alias = rs.Alias.retrieve(
+            rs.Alias.retrieve(
                 workspace=ws,
-                name=view
+                name=alias
             )
-            alias.drop()
-
-            # Wait until alias is gone
-            # TODO(sam)
+            return True
         except Exception as e:
-            pass
+            if isinstance(e, rockset.exception.InputError) and e.code == 404:
+                return False
+            else:
+                raise e
 
-        # TODO(sam) Test collection same name case
-        
-        # TODO(sam) Read adminserver code to ensure all cases are covered
+    def _does_collection_exist(self, ws, cname):
+        rs = self._rs_client()
+        try:
+            rs.Collection.retrieve(
+                workspace=ws,
+                name=cname
+            )
+            return True
+        except Exception as e:
+            if isinstance(e, rockset.exception.InputError) and e.code == 404:
+                return False
+            else:
+                raise e
+
+    def _create_view(self, ws, view, sql):
+        # Check if alias exists. If it does, delete it
+        rs = self._rs_client()
+        if self._does_alias_exist(ws, view):
+            raise Exception(f'You already have an alias {view} in workspace {ws}. Delete it and try again.')
+
+        if self._does_collection_exist(ws, view):
+            raise Exception(f'You already have a collection {view} in workspace {ws}. Delete it and try again.')
 
         endpoint = self._views_endpoint(ws)
         body = {
@@ -354,12 +367,9 @@ class RocksetAdapter(BaseAdapter):
             'query': sql,
             'description': 'Created via dbt'
         }
-        response = self._send_rs_request('POST', endpoint, body=body)
-        print(response)
-        print(response.text)
+        self._send_rs_request('POST', endpoint, body=body)
 
     def _update_view(self, ws, view, sql):
-        print("UPDATE VIEW")
         endpoint = self._views_endpoint(ws) + f'/{view}'
         body = {'query': sql}
         self._send_rs_request('POST', endpoint, body=body)
@@ -371,8 +381,7 @@ class RocksetAdapter(BaseAdapter):
     def create_view(self, relation, sql):
         ws = relation.schema
         view = relation.identifier
-        
-        print(ws, view)
+
         if not self._does_view_exist(ws, view):
             self._create_view(ws, view, sql)
         else:
