@@ -344,10 +344,15 @@ class RocksetAdapter(BaseAdapter):
         except Exception as e:
             pass
 
+        # TODO(sam) Test collection same name case
+        
+        # TODO(sam) Read adminserver code to ensure all cases are covered
+
         endpoint = self._views_endpoint(ws)
         body = {
             'name': view,
-            'query': sql
+            'query': sql,
+            'description': 'Created via dbt'
         }
         response = self._send_rs_request('POST', endpoint, body=body)
         print(response)
@@ -355,7 +360,11 @@ class RocksetAdapter(BaseAdapter):
 
     def _update_view(self, ws, view, sql):
         print("UPDATE VIEW")
+        endpoint = self._views_endpoint(ws) + f'/{view}'
+        body = {'query': sql}
+        self._send_rs_request('POST', endpoint, body=body)
 
+    # Table materialization
     # As of this comment, the rockset python sdk does not support views, so this is implemented
     # by hitting the api directly
     @available.parse(lambda *a, **k: '')
@@ -369,9 +378,7 @@ class RocksetAdapter(BaseAdapter):
         else:
             self._update_view(ws, view, sql)
 
-        raise dbt.exceptions.NotImplementedException(
-            'Rockset does not yet support views!'
-        )
+        # TODO(sam) consider sleeping 10 seconds or so to allow view sync to occur
 
     @available.parse(lambda *a, **k: '')
     def create_table_from_external(self, schema, identifier, options):
