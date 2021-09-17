@@ -12,8 +12,11 @@ import agate
 import dbt
 import json
 import os
+import requests
 from time import sleep, time
 from typing import List
+
+RS_API = 'https://api.rs2.usw2.rockset.com'
 
 class RocksetAdapter(BaseAdapter):
     RELATION_TYPES = {
@@ -296,8 +299,76 @@ class RocksetAdapter(BaseAdapter):
             else:
                 raise e
 
+    def _send_rs_request(self, type, endpoint, body=None):
+        url = RS_API + endpoint
+        headers = {"authorization": f'apikey {self._rs_api_key()}'}
+
+        if type == 'GET':
+            print(f'getting url {url}')
+            return requests.get(url, headers=headers)
+        elif type == 'POST':
+            print(f'posting url {url}')
+            return requests.post(url, headers=headers, json=body)
+        else:
+            raise Exception(f'Unimplemented request type {type}')
+
+    def _views_endpoint(self, ws):
+        return f'/v1/orgs/self/ws/{ws}/views'
+
+    def _does_view_exist(self, ws, view):
+        endpoint = self._views_endpoint(ws) + f'/{view}'
+        response = self._send_rs_request('GET', endpoint)
+        print(f'get response text: {response.text}')
+        if response.status_code == 404:
+            print(f'view {ws}.{view} does NOT exist')
+            return False
+        elif response.status_code == 200:
+            print(f'view {ws}.{view} DOES exist')
+            return True
+        else:
+            raise Exception(response.text)
+
+    def _create_view(self, ws, view, sql):
+        print("CREATE VIEW")
+        # Check if alias exists. If it does, delete it
+        rs = self._rs_client()
+        try:
+            alias = rs.Alias.retrieve(
+                workspace=ws,
+                name=view
+            )
+            alias.drop()
+
+            # Wait until alias is gone
+            # TODO(sam)
+        except Exception as e:
+            pass
+
+        endpoint = self._views_endpoint(ws)
+        body = {
+            'name': view,
+            'query': sql
+        }
+        response = self._send_rs_request('POST', endpoint, body=body)
+        print(response)
+        print(response.text)
+
+    def _update_view(self, ws, view, sql):
+        print("UPDATE VIEW")
+
+    # As of this comment, the rockset python sdk does not support views, so this is implemented
+    # by hitting the api directly
     @available.parse(lambda *a, **k: '')
     def create_view(self, relation, sql):
+        ws = relation.schema
+        view = relation.identifier
+        
+        print(ws, view)
+        if not self._does_view_exist(ws, view):
+            self._create_view(ws, view, sql)
+        else:
+            self._update_view(ws, view, sql)
+
         raise dbt.exceptions.NotImplementedException(
             'Rockset does not yet support views!'
         )
@@ -422,6 +493,9 @@ class RocksetAdapter(BaseAdapter):
 
     def _rs_client(self):
         return self.connections.get_thread_connection().handle._client()
+
+    def _rs_api_key(self):
+        return self.connections.get_thread_connection().credentials.api_key
 
     def _rs_cursor(self):
         return self.connections.get_thread_connection().handle.cursor()

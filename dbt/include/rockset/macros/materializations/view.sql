@@ -1,5 +1,4 @@
-{#-- Rockset has not yet implemented views --#}
-{% materialization view, adapter='rockset' -%}
-  
-   {{ adapter.create_view(relation, sql) }}
+{% materialization view, adapter='rockset' -%}  
+   {% set target_relation = this.incorporate(type='view') %}
+   {{ adapter.create_view(target_relation, sql) }}
 {%- endmaterialization %}
