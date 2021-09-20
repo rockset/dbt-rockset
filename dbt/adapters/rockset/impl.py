@@ -12,8 +12,12 @@ import agate
 import dbt
 import json
 import os
+import requests
+import rockset
 from time import sleep, time
 from typing import List
+
+RS_API = 'https://api.rs2.usw2.rockset.com'
 
 class RocksetAdapter(BaseAdapter):
     RELATION_TYPES = {
@@ -296,11 +300,98 @@ class RocksetAdapter(BaseAdapter):
             else:
                 raise e
 
+    def _send_rs_request(self, type, endpoint, body=None):
+        url = RS_API + endpoint
+        headers = {"authorization": f'apikey {self._rs_api_key()}'}
+
+        if type == 'GET':
+            return requests.get(url, headers=headers)
+        elif type == 'POST':
+            return requests.post(url, headers=headers, json=body)
+        else:
+            raise Exception(f'Unimplemented request type {type}')
+
+    def _views_endpoint(self, ws):
+        return f'/v1/orgs/self/ws/{ws}/views'
+
+    def _does_view_exist(self, ws, view):
+        endpoint = self._views_endpoint(ws) + f'/{view}'
+        response = self._send_rs_request('GET', endpoint)
+        if response.status_code == 404:
+            return False
+        elif response.status_code == 200:
+            return True
+        else:
+            raise Exception(response.text)
+
+    def _does_alias_exist(self, ws, alias):
+        rs = self._rs_client()
+        try:
+            rs.Alias.retrieve(
+                workspace=ws,
+                name=alias
+            )
+            return True
+        except Exception as e:
+            if isinstance(e, rockset.exception.InputError) and e.code == 404:
+                return False
+            else:
+                raise e
+
+    def _does_collection_exist(self, ws, cname):
+        rs = self._rs_client()
+        try:
+            rs.Collection.retrieve(
+                workspace=ws,
+                name=cname
+            )
+            return True
+        except Exception as e:
+            if isinstance(e, rockset.exception.InputError) and e.code == 404:
+                return False
+            else:
+                raise e
+
+    def _create_view(self, ws, view, sql):
+        # Check if alias exists. If it does, delete it
+        rs = self._rs_client()
+        if self._does_alias_exist(ws, view):
+            raise Exception(f'You already have an alias {view} in workspace {ws}. Delete it and try again.')
+
+        if self._does_collection_exist(ws, view):
+            raise Exception(f'You already have a collection {view} in workspace {ws}. Delete it and try again.')
+
+        endpoint = self._views_endpoint(ws)
+        body = {
+            'name': view,
+            'query': sql,
+            'description': 'Created via dbt'
+        }
+        self._send_rs_request('POST', endpoint, body=body)
+
+    def _update_view(self, ws, view, sql):
+        endpoint = self._views_endpoint(ws) + f'/{view}'
+        body = {'query': sql}
+        self._send_rs_request('POST', endpoint, body=body)
+
+    # Table materialization
+    # As of this comment, the rockset python sdk does not support views, so this is implemented
+    # by hitting the api directly
     @available.parse(lambda *a, **k: '')
     def create_view(self, relation, sql):
-        raise dbt.exceptions.NotImplementedException(
-            'Rockset does not yet support views!'
-        )
+        ws = relation.schema
+        view = relation.identifier
+
+        if not self._does_view_exist(ws, view):
+            self._create_view(ws, view, sql)
+        else:
+            self._update_view(ws, view, sql)
+
+        # TODO(sam) Wait for fully synced to roll out, then wait for it here
+        # in addition to sleep(3)
+
+        # Sleep a few seconds to be extra sure that all caches are updated with the new view
+        sleep(3)
 
     @available.parse(lambda *a, **k: '')
     def create_table_from_external(self, schema, identifier, options):
@@ -422,6 +513,9 @@ class RocksetAdapter(BaseAdapter):
 
     def _rs_client(self):
         return self.connections.get_thread_connection().handle._client()
+
+    def _rs_api_key(self):
+        return self.connections.get_thread_connection().credentials.api_key
 
     def _rs_cursor(self):
         return self.connections.get_thread_connection().handle.cursor()
