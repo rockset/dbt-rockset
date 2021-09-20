@@ -387,7 +387,11 @@ class RocksetAdapter(BaseAdapter):
         else:
             self._update_view(ws, view, sql)
 
-        # TODO(sam) consider sleeping 10 seconds or so to allow view sync to occur
+        # TODO(sam) Wait for fully synced to roll out, then wait for it here
+        # in addition to sleep(3)
+
+        # Sleep a few seconds to be extra sure that all caches are updated with the new view
+        sleep(3)
 
     @available.parse(lambda *a, **k: '')
     def create_table_from_external(self, schema, identifier, options):
