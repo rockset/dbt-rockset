@@ -11,12 +11,13 @@ import agate
 import dbt
 import rockset
 from rockset import Client, Q, F, sql
-from typing import List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 
 @dataclass
 class RocksetCredentials(Credentials):
     api_key: str
+    database: Optional[str]
     api_server: Optional[str] = 'api.rs2.usw2.rockset.com'
 
     @property
@@ -25,6 +26,13 @@ class RocksetCredentials(Credentials):
 
     def _connection_keys(self):
         return ('api_key', 'workspace', 'schema')
+
+    @classmethod
+    def __pre_deserialize__(cls, d: Dict[Any, Any]) -> Dict[Any, Any]:
+        # `database` is not a required property in Rockset
+        if 'database' not in d:
+            d['database'] = 'doesnt-matter'
+        return d
 
     _ALIASES = {
         'workspace': 'schema'
