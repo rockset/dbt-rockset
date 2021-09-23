@@ -24,7 +24,7 @@ class RocksetCredentials(Credentials):
         return 'rockset'
 
     def _connection_keys(self):
-        return ('api_server', 'workspace', 'schema', 'database')
+        return ('api_key', 'workspace', 'schema')
 
     _ALIASES = {
         'workspace': 'schema'

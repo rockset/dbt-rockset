@@ -261,6 +261,9 @@ class RocksetAdapter(BaseAdapter):
         )
         self._wait_until_collection_ready(cname_new, relation.schema)
 
+        # TODO(sam) Don't want to run the queries twice....
+        # JUST GET THE ROW COUNT FROM IIS
+
         # Get the expected row count, so we can wait until all docs are ingested
         cursor = self._rs_cursor()
         cursor.execute(sql)
@@ -473,6 +476,8 @@ class RocksetAdapter(BaseAdapter):
         raise dbt.exceptions.NotImplementedException(
             'Rockset does not yet support incremental materializations!'
         )
+
+        # TODO(sam): Insert a marker and wait for it to show up
 
         # The code below *kind of* implements incremental materializations, but I'm commenting it
         # out for now until it is better understood and tested
