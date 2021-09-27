@@ -244,6 +244,33 @@ class RocksetAdapter(BaseAdapter):
             collections=[cpath]
         )
 
+    def _wait_until_past_commit_fence(self, ws, cname, fence):
+        endpoint = f'/v1/orgs/self/ws/{ws}/collections/{cname}/offsets/commit?fence={fence}'
+        while True:
+            resp = self._send_rs_request('GET', endpoint)
+            resp_json = json.loads(resp.text)
+            passed = resp_json['data']['passed']
+            commit_offset = resp_json['offsets']['commit']
+            if passed:
+                logger.info(f'Commit offset {commit_offset} is past given fence {fence}')
+                break
+            else:
+                logger.info(f'Waiting for commit offset to pass fence {fence}; it is currently {commit_offset}')
+                sleep(3)
+
+
+    def _wait_until_iis_fully_ingested(self, ws, cname, query_id):
+        endpoint = f'/v1/orgs/self/queries/{query_id}'
+        while True:
+            query_resp = self._send_rs_request('GET', endpoint)
+            last_offset = json.loads(query_resp.text)['last_offset']
+            if last_offset is not None:
+                self._wait_until_past_commit_fence(ws, cname, last_offset)
+                break
+            else:
+                logger.info(f'IIS Query not yet finished processing; last offset not present')
+                sleep(3)
+
     # Table materialization
     @available.parse(lambda *a, **k: '')
     def create_table(self, relation, sql):
@@ -265,21 +292,13 @@ class RocksetAdapter(BaseAdapter):
         )
         self._wait_until_collection_ready(cname_new, ws)
 
-        # TODO(sam) Don't want to run the queries twice....
-        # JUST GET THE ROW COUNT FROM IIS
-
-        # Get the expected row count, so we can wait until all docs are ingested
-        cursor = self._rs_cursor()
-        cursor.execute(sql)
-        expected_doc_count = cursor.rowcount
-
-        # Run an INSERT INTO statement and wait for the expected doc count
+        # Run an INSERT INTO statement and wait for it to be fully ingested
         insert_into_sql = f'''
             INSERT INTO {ws}.{cname_new}
             {sql}
         '''
-        cursor.execute(insert_into_sql)
-        self._wait_until_docs(cname_new, ws, expected_doc_count)
+        iis_query_id = self._execute_query(insert_into_sql)
+        self._wait_until_iis_fully_ingested(ws, cname_new, iis_query_id)
 
         # Now we have a timestamp tagged table. Make sure that an alias named
         # relation.identifier is pointing to it
@@ -547,6 +566,15 @@ class RocksetAdapter(BaseAdapter):
 
     def _rs_cursor(self):
         return self.connections.get_thread_connection().handle.cursor()
+
+    # Execute a query not using the SQL cursor, but by hitting the REST api. This can be done
+    # if you need the QueryResponse object returned
+    # Returns: Query id (str)
+    def _execute_query(self, sql):
+        endpoint = '/v1/orgs/self/queries'
+        body = {'sql':{'query': sql}}
+        resp = self._send_rs_request('POST', endpoint, body=body)
+        return json.loads(resp.text)['query_id']
 
     def _wait_until_collection_does_not_exist(self, cname, ws):
         while True:
