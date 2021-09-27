@@ -138,14 +138,15 @@ class RocksetAdapter(BaseAdapter):
             '`rename` is not implemented for this adapter!'
         )
 
-    def get_relation(
-            self, database: str, schema: str, identifier: str
-        ) -> RocksetRelation:
-        logger.info(f'Getting relation {schema}.{identifier}')
+    @available.parse(lambda *a, **k: '')
+    def get_alias(self, relation) -> RocksetRelation:
+        ws = relation.schema
+        alias = relation.identifier
+
         try:
             rs = self._rs_client()
-            collection = rs.Collection.retrieve(identifier, workspace=schema)
-            return self._rs_collection_to_relation(collection)
+            existing_alias = rs.Alias.retrieve(alias, workspace=ws)
+            return self._rs_alias_to_relation(existing_alias)
         except Exception as e:
             if e.code == 404 and e.type == 'NotFound': # Collection does not exist
                 return None
@@ -155,21 +156,21 @@ class RocksetAdapter(BaseAdapter):
     def list_relations_without_caching(
         self, schema_relation: RocksetRelation
     ) -> List[RocksetRelation]:
-        logger.info(f'Listing relations without caching')
+
         # get Rockset client to use Rockset's Python API
         rs = self._rs_client()
         if schema_relation and schema_relation.identifier and schema_relation.schema:
-            collections = [rs.Collection.retrieve(
+            aliases = [rs.Alias.retrieve(
                 schema_relation.identifier,
                 workspace=schema_relation.schema,
             )]
         else:
-            collections = rs.Collection.list()
+            aliases = rs.Alias.list()
 
-        # map Rockset collections to RocksetRelation
+        # map Rockset aliases to RocksetRelation
         relations = []
-        for collection in collections:
-            relations.append(self._rs_collection_to_relation(collection))
+        for alias in aliases:
+            relations.append(self._rs_alias_to_relation(alias))
 
         return relations
 
@@ -268,7 +269,7 @@ class RocksetAdapter(BaseAdapter):
                 self._wait_until_past_commit_fence(ws, cname, last_offset)
                 break
             else:
-                logger.info(f'IIS Query not yet finished processing; last offset not present')
+                logger.info(f'Insert Into Query not yet finished processing; last offset not present')
                 sleep(3)
 
     # Table materialization
@@ -512,44 +513,37 @@ class RocksetAdapter(BaseAdapter):
 
     @available.parse(lambda *a, **k: '')
     def add_incremental_docs(self, relation, sql, unique_key):
-        raise dbt.exceptions.NotImplementedException(
-            'Rockset does not yet support incremental materializations!'
-        )
+        if unique_key and unique_key != '_id':
+            raise dbt.exceptions.NotImplementedException(
+                '`unique_key` can only be set to `_id` with the Rockset adapter!'
+            )
 
-        # TODO(sam): Insert a marker and wait for it to show up
+        ws = relation.schema
+        alias = relation.identifier
 
-        # The code below *kind of* implements incremental materializations, but I'm commenting it
-        # out for now until it is better understood and tested
+        rs = self._rs_client()
+        existing_alias = rs.Alias.retrieve(alias, workspace=ws)
+        cname = None
+        for cpath in existing_alias.collections:
+            collection_ws, collection = cpath.split('.')
+            if ws == collection_ws and collection.startswith(alias):
+                if cname is not None:
+                    raise dbt.exceptions.Exception(f'Found multiple eligible collections referenced by {alias}; there may only be one')
+                else:
+                    cname = collection
 
+        if cname is None:
+            raise dbt.exceptions.Exception(
+                f'Found no eligible collection referenced by {alias}; the referenced collection should be in the target ws, and be prefixed with the alias name'
+            )
 
-        # logger.info(f'Adding incremental docs to {relation.schema}.{relation.identifier}')
-
-        # # Execute the provided sql and fetch results
-        # json_results = sql_to_json_results(self._rs_cursor(), sql)
-
-        # # TODO: Uncomment the two lines below to support using the unique_key. It works as expected,
-        # # but the only thing we can't do is wait until all the new docs are ingested, bc we can't
-        # # depend on final doc count when there are overrides and we have no way of knowing when the
-        # # overrides complete
-        # if unique_key:
-        #     # self._update_ids_using_unique_key(json_results, unique_key, relation)
-        #     # self._strip_internal_fields(json_results, keep_id=True)
-        #     raise dbt.exceptions.NotImplementedException(
-        #         '`unique_key` not yet supported for the Rockset adapter!'
-        #     )
-        # else:
-        #     c = self._rs_client().Collection.retrieve(
-        #         relation.identifier,
-        #         workspace=relation.schema
-        #     )
-        #     initial_doc_count = c.describe()['data']['stats']['doc_count']
-
-        #     self._strip_internal_fields(json_results)
-        #     expected_doc_count = initial_doc_count + len(json_results)
-
-        #  # Write the docs to the created table and wait until they are ingested
-        # c.add_docs(json_results)
-        # self._wait_until_docs(relation.identifier, relation.schema, expected_doc_count)
+        # Run an INSERT INTO statement and wait for it to be fully ingested
+        insert_into_sql = f'''
+            INSERT INTO {ws}.{cname}
+            {sql}
+        '''
+        iis_query_id = self._execute_query(insert_into_sql)
+        self._wait_until_iis_fully_ingested(ws, cname, iis_query_id)
 
     ###
     # Internal Rockset helper methods
@@ -573,8 +567,11 @@ class RocksetAdapter(BaseAdapter):
     def _execute_query(self, sql):
         endpoint = '/v1/orgs/self/queries'
         body = {'sql':{'query': sql}}
-        resp = self._send_rs_request('POST', endpoint, body=body)
-        return json.loads(resp.text)['query_id']
+        try:
+            resp = self._send_rs_request('POST', endpoint, body=body)
+            return json.loads(resp.text)['query_id']
+        except Exception as e:
+            raise dbt.exceptions.Exception(e)
 
     def _wait_until_collection_does_not_exist(self, cname, ws):
         while True:
@@ -614,7 +611,7 @@ class RocksetAdapter(BaseAdapter):
                 logger.info(f'Waiting for collection {ws}.{cname} to have {doc_count} docs, it has {actual_count}...')
                 sleep(5)
 
-    def _rs_collection_to_relation(self, collection):
+    def _rs_alias_to_relation(self, collection):
         if collection is None:
             return None
 
@@ -631,30 +628,6 @@ class RocksetAdapter(BaseAdapter):
             type='table',
             quote_policy=quote_policy
         )
-
-    def _strip_internal_fields(self, json_results, keep_id=False):
-        fields_to_drop = ['_event_time', '_meta']
-
-        if not keep_id:
-            fields_to_drop.append('_id')
-
-        for res in json_results:
-            for field in fields_to_drop:
-                res.pop(field, None)
-
-    def _update_ids_using_unique_key(self, json_results, unique_key, target_relation):
-        sql = f'SELECT * FROM {target_relation.schema}.{target_relation.identifier}'
-        target_collection_docs = sql_to_json_results(self._rs_cursor(), sql)
-
-        unique_key_val_to_id = {}
-        for doc in target_collection_docs:
-            if unique_key in doc:
-                unique_key_val = str(doc[unique_key])
-                unique_key_val_to_id[unique_key_val] = doc['_id']
-
-        for res in json_results:
-            if unique_key in res and str(res[unique_key]) in unique_key_val_to_id:
-                res['_id'] = unique_key_val_to_id[str(res[unique_key])]
 
     def _drop_collection(self, rs, cname, ws):
         try:

@@ -2,7 +2,7 @@
   {%- set unique_key = config.get('unique_key') -%}
   {%- set full_refresh_mode = (should_full_refresh()) -%}
   {%- set target_relation = this %}
-  {%- set existing_relation = load_relation(this) %}
+  {%- set existing_relation = adapter.get_alias(target_relation) %}
 
   {{ run_hooks(pre_hooks) }}
 
