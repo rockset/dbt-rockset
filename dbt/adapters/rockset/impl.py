@@ -17,7 +17,6 @@ import rockset
 from time import sleep, time
 from typing import List
 
-RS_API = 'https://api.rs2.usw2.rockset.com'
 
 class RocksetAdapter(BaseAdapter):
     RELATION_TYPES = {
@@ -304,7 +303,7 @@ class RocksetAdapter(BaseAdapter):
                 raise e
 
     def _send_rs_request(self, type, endpoint, body=None):
-        url = RS_API + endpoint
+        url = self._rs_api_server() + endpoint
         headers = {"authorization": f'apikey {self._rs_api_key()}'}
 
         if type == 'GET':
@@ -521,6 +520,9 @@ class RocksetAdapter(BaseAdapter):
 
     def _rs_api_key(self):
         return self.connections.get_thread_connection().credentials.api_key
+
+    def _rs_api_server(self):
+        return f'https://{self.connections.get_thread_connection().credentials.api_server}'
 
     def _rs_cursor(self):
         return self.connections.get_thread_connection().handle.cursor()
