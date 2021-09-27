@@ -355,7 +355,7 @@ class RocksetAdapter(BaseAdapter):
                 raise e
 
     def _create_view(self, ws, view, sql):
-        # Check if alias exists. If it does, delete it
+        # Check if alias or collection exist with same name
         rs = self._rs_client()
         if self._does_alias_exist(ws, view):
             raise Exception(f'You already have an alias {view} in workspace {ws}. Delete it and try again.')
@@ -376,9 +376,24 @@ class RocksetAdapter(BaseAdapter):
         body = {'query': sql}
         self._send_rs_request('POST', endpoint, body=body)
 
-    # Table materialization
+    def _wait_until_view_fully_synced(self, ws, view):
+        endpoint = f'{self._views_endpoint(ws)}/{view}'
+        while True:
+            resp = self._send_rs_request('GET', endpoint)
+            view_json = json.loads(resp.text)['data']
+            state = view_json['state']
+
+            if state == 'SYNCING':
+                logger.info(f'Waiting for view {ws}.{view} to be fully synced')
+                sleep(3)
+            else:
+                logger.info(f'View {ws}.{view} is synced and ready to be queried')
+                break
+
+
+    # View materialization
     # As of this comment, the rockset python sdk does not support views, so this is implemented
-    # by hitting the api directly
+    # with the python requests library
     @available.parse(lambda *a, **k: '')
     def create_view(self, relation, sql):
         ws = relation.schema
@@ -389,8 +404,9 @@ class RocksetAdapter(BaseAdapter):
         else:
             self._update_view(ws, view, sql)
 
-        # TODO(sam) Wait for fully synced to roll out, then wait for it here
-        # in addition to sleep(3)
+        # If we wait until the view is synced, then we can be sure that any subsequent queries
+        # of the view will use the new sql text
+        self._wait_until_view_fully_synced(ws, view)
 
         # Sleep a few seconds to be extra sure that all caches are updated with the new view
         sleep(3)
