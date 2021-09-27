@@ -60,10 +60,11 @@ class RocksetConnectionManager(BaseConnectionManager):
 
             connection.state = 'open'
             connection.handle = handle
+            return connection
         except Exception as e:
             connection.state = 'fail'
             connection.handle = None
-        return connection
+            raise dbt.exceptions.FailedToConnectException(e)
 
     @classmethod
     def get_status(cls, cursor):
