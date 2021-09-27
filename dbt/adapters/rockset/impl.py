@@ -247,18 +247,23 @@ class RocksetAdapter(BaseAdapter):
     # Table materialization
     @available.parse(lambda *a, **k: '')
     def create_table(self, relation, sql):
+        ws = relation.schema
+
+        if self._does_view_exist(ws, relation.identifier):
+            raise Exception(f'You already have a view {relation.identifier} in workspace {ws}. Delete it and try again.')
+
         current_millis = round(time() * 1000)
         cname_new = f'{relation.identifier}_{current_millis}'
-        cpath = f'{relation.schema}.{cname_new}'
+        cpath = f'{ws}.{cname_new}'
 
-        logger.info(f'Creating collection {relation.schema}.{cname_new}')
+        logger.info(f'Creating collection {ws}.{cname_new}')
         rs = self._rs_client()
 
         c = rs.Collection.create(
             cname_new,
-            workspace=relation.schema
+            workspace=ws
         )
-        self._wait_until_collection_ready(cname_new, relation.schema)
+        self._wait_until_collection_ready(cname_new, ws)
 
         # TODO(sam) Don't want to run the queries twice....
         # JUST GET THE ROW COUNT FROM IIS
@@ -270,18 +275,18 @@ class RocksetAdapter(BaseAdapter):
 
         # Run an INSERT INTO statement and wait for the expected doc count
         insert_into_sql = f'''
-            INSERT INTO {relation.schema}.{cname_new}
+            INSERT INTO {ws}.{cname_new}
             {sql}
         '''
         cursor.execute(insert_into_sql)
-        self._wait_until_docs(cname_new, relation.schema, expected_doc_count)
+        self._wait_until_docs(cname_new, ws, expected_doc_count)
 
         # Now we have a timestamp tagged table. Make sure that an alias named
         # relation.identifier is pointing to it
         alias_name = relation.identifier
 
         try:
-            alias = rs.Alias.retrieve(alias_name, workspace=relation.schema)
+            alias = rs.Alias.retrieve(alias_name, workspace=ws)
 
             old_collections = alias.collections
             alias.update(collections=[cpath])
