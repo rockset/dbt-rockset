@@ -567,11 +567,11 @@ class RocksetAdapter(BaseAdapter):
     def _execute_query(self, sql):
         endpoint = '/v1/orgs/self/queries'
         body = {'sql':{'query': sql}}
-        try:
-            resp = self._send_rs_request('POST', endpoint, body=body)
-            return json.loads(resp.text)['query_id']
-        except Exception as e:
-            raise dbt.exceptions.Exception(e)
+        resp = self._send_rs_request('POST', endpoint, body=body)
+        if resp.status_code != 200:
+            raise dbt.exceptions.Exception(resp.text)
+
+        return json.loads(resp.text)['query_id']
 
     def _wait_until_collection_does_not_exist(self, cname, ws):
         while True:
