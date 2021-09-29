@@ -67,7 +67,7 @@ class RocksetConnectionManager(BaseConnectionManager):
             raise dbt.exceptions.FailedToConnectException(e)
 
     @classmethod
-    def get_status(cls, cursor):
+    def get_status(cls, cursor) -> str:
         # Rockset cursors don't have a status_message
         return 'OK'
 
@@ -89,6 +89,7 @@ class RocksetConnectionManager(BaseConnectionManager):
         )
 
     # Rockset does not implement transactions
+    # Should we explicitly throw here like the other methods?
     def clear_transaction(self) -> None:
         logger.info(f'Clearing transaction')
 
@@ -117,5 +118,6 @@ class RocksetConnectionManager(BaseConnectionManager):
             raise e
 
     @classmethod
-    def get_response(cls, cursor):
+    # Type of cursor?
+    def get_response(cls, cursor) -> str:
         return 'OK'

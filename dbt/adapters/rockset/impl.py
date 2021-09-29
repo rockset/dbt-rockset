@@ -5,7 +5,7 @@ from dbt.adapters.sql import SQLAdapter
 from dbt.adapters.rockset.connections import RocksetConnectionManager
 from dbt.adapters.rockset.relation import RocksetRelation
 from dbt.adapters.rockset.column import RocksetColumn
-from dbt.adapters.rockset.util import sql_to_json_results
+from dbt.adapters.rockset.util import sql_to_json_results, poll
 from dbt.logger import GLOBAL_LOGGER as logger
 
 import agate
@@ -16,6 +16,8 @@ import requests
 import rockset
 from time import sleep, time
 from typing import List
+
+# (General comment): Let's add docstring comments for all "public" methods
 
 
 class RocksetAdapter(BaseAdapter):
@@ -131,6 +133,7 @@ class RocksetAdapter(BaseAdapter):
 
         self._wait_until_collection_does_not_exist(relation.identifier, relation.schema)
 
+    # Perhaps a future for later, but can we implement this as recreating/the collection and the dropping the old one?
     def rename_relation(
         self, from_relation: RocksetRelation, to_relation: RocksetRelation
     ) -> None:
@@ -212,7 +215,9 @@ class RocksetAdapter(BaseAdapter):
     # Special Rockset implementations
     ###
 
+    # Need to be underscore prefixed?
     # Used to create seed tables for testing
+    # Types for method arguments?
     @available.parse_none
     def load_dataframe(self, database, schema, table_name, agate_table,
                        column_override):
@@ -245,21 +250,26 @@ class RocksetAdapter(BaseAdapter):
             collections=[cpath]
         )
 
+    # Shall we use exponential backoff for all these waiting methods starting at 1 with a cap of say 16 seconds?
+    # See the utility I wrote and wrapped this method with for an example
+    @poll(backoff_multiplier=2)
     def _wait_until_past_commit_fence(self, ws, cname, fence):
         endpoint = f'/v1/orgs/self/ws/{ws}/collections/{cname}/offsets/commit?fence={fence}'
-        while True:
-            resp = self._send_rs_request('GET', endpoint)
-            resp_json = json.loads(resp.text)
-            passed = resp_json['data']['passed']
-            commit_offset = resp_json['offsets']['commit']
-            if passed:
-                logger.info(f'Commit offset {commit_offset} is past given fence {fence}')
-                break
-            else:
-                logger.info(f'Waiting for commit offset to pass fence {fence}; it is currently {commit_offset}')
-                sleep(3)
+        resp = self._send_rs_request('GET', endpoint)
+        resp_json = json.loads(resp.text)
+        passed = resp_json['data']['passed']
+        commit_offset = resp_json['offsets']['commit']
+        # Are we worried about this spamming the logs? Perhaps a debug log?
+        if passed:
+            logger.info(f'Commit offset {commit_offset} is past given fence {fence}')
+            return True
+        else:
+            logger.info(f'Waiting for commit offset to pass fence {fence}; it is currently {commit_offset}')
+            return False
 
 
+    # Instead of waiting to be past commit fence in here, let's let the caller do that. That way this method
+    # just does one thing -- polling IIS ingest status. Also same comment about polling decorator here.
     def _wait_until_iis_fully_ingested(self, ws, cname, query_id):
         endpoint = f'/v1/orgs/self/queries/{query_id}'
         while True:
@@ -274,6 +284,7 @@ class RocksetAdapter(BaseAdapter):
 
     # Table materialization
     @available.parse(lambda *a, **k: '')
+    # Need types for method arguments?
     def create_table(self, relation, sql):
         ws = relation.schema
 
@@ -434,6 +445,8 @@ class RocksetAdapter(BaseAdapter):
         self._wait_until_view_fully_synced(ws, view)
 
         # Sleep a few seconds to be extra sure that all caches are updated with the new view
+        # Hmm, do we really need this? This feels a bit hacky especially in an open source library. Perhaps we can
+        # improve the backend so we don't need this in the client?
         sleep(3)
 
     @available.parse(lambda *a, **k: '')
@@ -486,6 +499,7 @@ class RocksetAdapter(BaseAdapter):
         logger.info(f'Waiting {wait_seconds_before_switch} seconds before switching the alias to the new collection')
         sleep(wait_seconds_before_switch)
 
+        # Should we have a utility method for this? Perhaps in the SDK itself
         collection_path = schema + '.' + cname
         try:
             alias = rs.Alias.retrieve(alias_name, workspace=schema)
@@ -495,6 +509,7 @@ class RocksetAdapter(BaseAdapter):
             alias.update(collections=[collection_path])
 
             # Wait 2 minutes before dropping the old collections, to be sure the alias has switched over
+            # This sleep also feels a bit weird. Do we need it or can we make some backend improvement to hide this from the client? Perhaps even poll something instead?
             sleep(120)
 
             for collection_path in collections_to_drop:
@@ -503,6 +518,7 @@ class RocksetAdapter(BaseAdapter):
         except Exception as e:
             logger.info(e)
             # If not found, create it and point it to the collection
+            # What other types will a 404 code have? Is the second check needed?
             if e.code == 404 and e.type == 'NotFound':
                 rs.Alias.create(
                     alias_name,
@@ -584,6 +600,7 @@ class RocksetAdapter(BaseAdapter):
                     return
                 raise e
 
+    # Same comment about exponential backoff
     def _wait_until_collection_ready(self, cname, ws):
         while True:
             c = self._rs_client().Collection.retrieve(
@@ -597,6 +614,7 @@ class RocksetAdapter(BaseAdapter):
                 logger.info(f'Waiting for collection {ws}.{cname} to become ready...')
                 sleep(5)
 
+    # Same comment about exponential backoff
     def _wait_until_docs(self, cname, ws, doc_count):
         while True:
             c = self._rs_client().Collection.retrieve(
