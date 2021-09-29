@@ -278,7 +278,7 @@ class RocksetAdapter(BaseAdapter):
         ws = relation.schema
 
         if self._does_view_exist(ws, relation.identifier):
-            raise Exception(f'You already have a view {relation.identifier} in workspace {ws}. Delete it and try again.')
+            self._delete_view(ws, relation.identifier)
 
         current_millis = round(time() * 1000)
         cname_new = f'{relation.identifier}_{current_millis}'
@@ -335,6 +335,8 @@ class RocksetAdapter(BaseAdapter):
             return requests.get(url, headers=headers)
         elif type == 'POST':
             return requests.post(url, headers=headers, json=body)
+        elif type == 'DELETE':
+            return requests.delete(url, headers=headers)
         else:
             raise Exception(f'Unimplemented request type {type}')
 
@@ -395,6 +397,11 @@ class RocksetAdapter(BaseAdapter):
             'description': 'Created via dbt'
         }
         self._send_rs_request('POST', endpoint, body=body)
+
+    def _delete_view(self, ws, view):
+        endpoint = f'{self._views_endpoint(ws)}/{view}'
+        self._send_rs_request('DELETE', endpoint)
+        self._wait_until_view_does_not_exist(ws, view)
 
     def _update_view(self, ws, view, sql):
         endpoint = self._views_endpoint(ws) + f'/{view}'
@@ -583,6 +590,14 @@ class RocksetAdapter(BaseAdapter):
                 if e.code == 404 and e.type == 'NotFound': # Collection does not exist
                     return
                 raise e
+
+    def _wait_until_view_does_not_exist(self, ws, view):
+        while True:
+            if self._does_view_exist(ws, view):
+                logger.info(f'Waiting for view {ws}.{view} to be deleted')
+                sleep(3)
+            else:
+                break
 
     def _wait_until_collection_ready(self, cname, ws):
         while True:
