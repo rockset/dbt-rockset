@@ -385,10 +385,10 @@ class RocksetAdapter(BaseAdapter):
         # Check if alias or collection exist with same name
         rs = self._rs_client()
         if self._does_alias_exist(ws, view):
-            raise Exception(f'You already have an alias {view} in workspace {ws}. Delete it and try again.')
+            self._delete_alias(rs, ws, view)
 
         if self._does_collection_exist(ws, view):
-            raise Exception(f'You already have a collection {view} in workspace {ws}. Delete it and try again.')
+            self._drop_collection(ws, view)
 
         endpoint = self._views_endpoint(ws)
         body = {
@@ -506,7 +506,7 @@ class RocksetAdapter(BaseAdapter):
 
             for collection_path in collections_to_drop:
                 dropping_ws, dropping_cname = collection_path.split('.')
-                self._drop_collection(rs, dropping_cname, dropping_ws)
+                self._drop_collection(rs, dropping_ws, dropping_cname)
         except Exception as e:
             logger.info(e)
             # If not found, create it and point it to the collection
@@ -644,11 +644,36 @@ class RocksetAdapter(BaseAdapter):
             quote_policy=quote_policy
         )
 
-    def _drop_collection(self, rs, cname, ws):
+    def _wait_until_alias_deleted(self, ws, alias):
+        while True:
+            if self._does_alias_exist(ws, alias):
+                logger.info(f'Waiting for alias {ws}.{alias} to be deleted')
+                sleep(3)
+            else:
+                break
+
+    def _wait_until_collection_deleted(self, ws, cname):
+        while True:
+            if self._does_collection_exist(ws, cname):
+                logger.info(f'Waiting for collection {ws}.{cname} to be deleted')
+                sleep(3)
+            else:
+                break
+
+    def _drop_collection(self, rs, ws, cname):
         try:
             c = rs.Collection.retrieve(cname, workspace=ws)
             c.drop()
+            self._wait_until_collection_deleted(ws, cname)
         except Exception as e:
-            logger.info(e)
+            if e.code != 404 or e.type != 'NotFound':
+                raise e # Unexpected error
+
+    def _delete_alias(self, rs, ws, alias):
+        try:
+            a = rs.Alias.retrieve(alias, workspace=ws)
+            a.drop()
+            self._wait_until_alias_deleted(ws, alias)
+        except Exception as e:
             if e.code != 404 or e.type != 'NotFound':
                 raise e # Unexpected error
