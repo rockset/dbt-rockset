@@ -1,0 +1,8 @@
+rockset:
+  outputs:
+    dev:
+      type: rockset
+      database: N/A
+      workspace: <rockset_workspace_name>
+      api_key: <rockset_api_key>
+  target: dev
