@@ -24,6 +24,10 @@ class RocksetCredentials(Credentials):
     def type(self):
         return 'rockset'
 
+    @property
+    def unique_field(self):
+        return self.api_key
+
     def _connection_keys(self):
         return ('api_key', 'workspace', 'schema')
 
