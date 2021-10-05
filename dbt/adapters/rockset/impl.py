@@ -327,25 +327,30 @@ class RocksetAdapter(BaseAdapter):
             else:
                 raise e
 
-    def _send_rs_request(self, type, endpoint, body=None):
+    def _send_rs_request(self, type, endpoint, body=None, check_success=True):
         url = self._rs_api_server() + endpoint
         headers = {"authorization": f'apikey {self._rs_api_key()}'}
 
         if type == 'GET':
-            return requests.get(url, headers=headers)
+            resp = requests.get(url, headers=headers)
         elif type == 'POST':
-            return requests.post(url, headers=headers, json=body)
+            resp = requests.post(url, headers=headers, json=body)
         elif type == 'DELETE':
-            return requests.delete(url, headers=headers)
+            resp = requests.delete(url, headers=headers)
         else:
             raise Exception(f'Unimplemented request type {type}')
+
+        code = resp.status_code
+        if check_success and (code < 200 or code > 299):
+            raise Exception(resp.text)
+        return resp
 
     def _views_endpoint(self, ws):
         return f'/v1/orgs/self/ws/{ws}/views'
 
     def _does_view_exist(self, ws, view):
         endpoint = self._views_endpoint(ws) + f'/{view}'
-        response = self._send_rs_request('GET', endpoint)
+        response = self._send_rs_request('GET', endpoint, check_success=False)
         if response.status_code == 404:
             return False
         elif response.status_code == 200:
