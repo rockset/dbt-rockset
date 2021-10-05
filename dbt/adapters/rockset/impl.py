@@ -278,7 +278,7 @@ class RocksetAdapter(BaseAdapter):
         ws = relation.schema
 
         if self._does_view_exist(ws, relation.identifier):
-            self._delete_view(ws, relation.identifier)
+            self._delete_view_recursively(ws, relation.identifier)
 
         current_millis = round(time() * 1000)
         cname_new = f'{relation.identifier}_{current_millis}'
@@ -398,10 +398,31 @@ class RocksetAdapter(BaseAdapter):
         }
         self._send_rs_request('POST', endpoint, body=body)
 
-    def _delete_view(self, ws, view):
+    # Delete the view and any views that depend on it (recursively)
+    def _delete_view_recursively(self, ws, view):
+        for ref_view in self._get_referencing_views(ws, view):
+            self._delete_view_recursively(ref_view[0], ref_view[1])
+
         endpoint = f'{self._views_endpoint(ws)}/{view}'
-        self._send_rs_request('DELETE', endpoint)
+        view_resp = self._send_rs_request('GET', endpoint)
+        view_json = json.loads(view_resp.text)
+        resp = self._send_rs_request('DELETE', endpoint)
+
         self._wait_until_view_does_not_exist(ws, view)
+
+    def _get_referencing_views(self, ws, view):
+        view_path = f'{ws}.{view}'
+
+        list_endpoint = f'{self._views_endpoint(ws)}'
+        list_resp = self._send_rs_request('GET', list_endpoint)
+        list_json = json.loads(list_resp.text)
+
+        results = []
+        for view in list_json['data']:
+            for referenced_entity in view['entities']:
+                if referenced_entity == view_path:
+                    results.append((view['workspace'], view['name']))
+        return results
 
     def _update_view(self, ws, view, sql):
         endpoint = self._views_endpoint(ws) + f'/{view}'
@@ -671,6 +692,8 @@ class RocksetAdapter(BaseAdapter):
 
     def _delete_alias(self, rs, ws, alias):
         try:
+            for ref_view in self._get_referencing_views(ws, alias):
+                self._delete_view_recursively(ref_view[0], ref_view[1])
             a = rs.Alias.retrieve(alias, workspace=ws)
             a.drop()
             self._wait_until_alias_deleted(ws, alias)
