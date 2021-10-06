@@ -37,3 +37,11 @@ materializedview | NO | Support coming soon
 ephemeral | NO | Support coming soon
 incremental | NO | Support coming soon
 
+### Formatting
+
+Before landing a commit, format changes according to pep8 using these commands:
+```
+pip3 install autopep8
+autopep8 --in-place --recursive .
+```
+
