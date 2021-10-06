@@ -121,14 +121,9 @@ class RocksetAdapter(BaseAdapter):
 
     @available.parse_list
     def drop_relation(self, relation: RocksetRelation) -> None:
-        logger.debug(f'Dropping relation {relation.schema}.{relation.identifier}')
-        rs = self._rs_client()
-        rs.Collection.retrieve(
-            relation.identifier,
-            workspace=relation.schema
-        ).drop()
-
-        self._wait_until_collection_does_not_exist(relation.identifier, relation.schema)
+        raise dbt.exceptions.NotImplementedException(
+            '`drop_relation` is not implemented for this adapter!'
+        )
 
     def rename_relation(
         self, from_relation: RocksetRelation, to_relation: RocksetRelation
@@ -270,6 +265,9 @@ class RocksetAdapter(BaseAdapter):
         cname = relation.identifier
         rs = self._rs_client()
 
+        if self._does_collection_exist(ws, cname):
+            self._delete_collection(rs, ws, cname)
+
         if self._does_alias_exist(ws, cname):
             self._delete_alias(rs, ws, cname)
 
@@ -358,7 +356,7 @@ class RocksetAdapter(BaseAdapter):
             self._delete_alias(rs, ws, view)
 
         if self._does_collection_exist(ws, view):
-            self._drop_collection(ws, view)
+            self._delete_collection(rs, ws, view)
 
         endpoint = self._views_endpoint(ws)
         body = {
@@ -560,8 +558,11 @@ class RocksetAdapter(BaseAdapter):
             else:
                 break
 
-    def _drop_collection(self, rs, ws, cname):
+    def _delete_collection(self, rs, ws, cname):
         try:
+            for ref_view in self._get_referencing_views(ws, cname):
+                self._delete_view_recursively(ref_view[0], ref_view[1])
+
             c = rs.Collection.retrieve(cname, workspace=ws)
             c.drop()
             self._wait_until_collection_deleted(ws, cname)
@@ -573,6 +574,7 @@ class RocksetAdapter(BaseAdapter):
         try:
             for ref_view in self._get_referencing_views(ws, alias):
                 self._delete_view_recursively(ref_view[0], ref_view[1])
+
             a = rs.Alias.retrieve(alias, workspace=ws)
             a.drop()
             self._wait_until_alias_deleted(ws, alias)
