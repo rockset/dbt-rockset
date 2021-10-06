@@ -84,15 +84,16 @@ class RocksetAdapter(BaseAdapter):
                 workspace = rs.Workspace.retrieve(relation.schema)
                 if workspace.collection_count == 0:
                     break
-                logger.debug(f'Waiting for ws {relation.schema} to have 0 collections, has {workspace.collection_count}')
+                logger.debug(
+                    f'Waiting for ws {relation.schema} to have 0 collections, has {workspace.collection_count}')
                 sleep(5)
 
             # Now delete the workspace
             rs.Workspace.delete(relation.schema)
         except Exception as e:
-            if e.code == 404 and e.type == 'NotFound': # Workspace does not exist
+            if e.code == 404 and e.type == 'NotFound':  # Workspace does not exist
                 return None
-            else: # Unexpected error
+            else:  # Unexpected error
                 raise e
 
     @available.parse(lambda *a, **k: False)
@@ -141,9 +142,9 @@ class RocksetAdapter(BaseAdapter):
             existing_collection = rs.Collection.retrieve(cname, workspace=ws)
             return self._rs_collection_to_relation(existing_collection)
         except Exception as e:
-            if e.code == 404 and e.type == 'NotFound': # Collection does not exist
+            if e.code == 404 and e.type == 'NotFound':  # Collection does not exist
                 return None
-            else: # Unexpected error
+            else:  # Unexpected error
                 raise e
 
     def list_relations_without_caching(
@@ -238,12 +239,13 @@ class RocksetAdapter(BaseAdapter):
             passed = resp_json['data']['passed']
             commit_offset = resp_json['offsets']['commit']
             if passed:
-                logger.debug(f'Commit offset {commit_offset} is past given fence {fence}')
+                logger.debug(
+                    f'Commit offset {commit_offset} is past given fence {fence}')
                 break
             else:
-                logger.debug(f'Waiting for commit offset to pass fence {fence}; it is currently {commit_offset}')
+                logger.debug(
+                    f'Waiting for commit offset to pass fence {fence}; it is currently {commit_offset}')
                 sleep(3)
-
 
     def _wait_until_iis_fully_ingested(self, ws, cname, query_id):
         endpoint = f'/v1/orgs/self/queries/{query_id}'
@@ -254,7 +256,8 @@ class RocksetAdapter(BaseAdapter):
                 self._wait_until_past_commit_fence(ws, cname, last_offset)
                 break
             else:
-                logger.debug(f'Insert Into Query not yet finished processing; last offset not present')
+                logger.debug(
+                    f'Insert Into Query not yet finished processing; last offset not present')
                 sleep(3)
 
     # Table materialization
@@ -404,16 +407,18 @@ class RocksetAdapter(BaseAdapter):
             state = view_json['state']
 
             if state == 'SYNCING':
-                logger.debug(f'Waiting for view {ws}.{view} to be fully synced')
+                logger.debug(
+                    f'Waiting for view {ws}.{view} to be fully synced')
                 sleep(3)
             else:
-                logger.debug(f'View {ws}.{view} is synced and ready to be queried')
+                logger.debug(
+                    f'View {ws}.{view} is synced and ready to be queried')
                 break
-
 
     # View materialization
     # As of this comment, the rockset python sdk does not support views, so this is implemented
     # with the python requests library
+
     @available.parse(lambda *a, **k: '')
     def create_view(self, relation, sql):
         ws = relation.schema
@@ -470,7 +475,7 @@ class RocksetAdapter(BaseAdapter):
     # Returns: Query id (str)
     def _execute_query(self, sql):
         endpoint = '/v1/orgs/self/queries'
-        body = {'sql':{'query': sql}}
+        body = {'sql': {'query': sql}}
         resp = self._send_rs_request('POST', endpoint, body=body)
         if resp.status_code != 200:
             raise dbt.exceptions.Exception(resp.text)
@@ -481,10 +486,11 @@ class RocksetAdapter(BaseAdapter):
         while True:
             try:
                 c = self._rs_client().Collection.retrieve(cname, workspace=ws)
-                logger.debug(f'Waiting for collection {ws}.{cname} to be deleted...')
+                logger.debug(
+                    f'Waiting for collection {ws}.{cname} to be deleted...')
                 sleep(5)
             except Exception as e:
-                if e.code == 404 and e.type == 'NotFound': # Collection does not exist
+                if e.code == 404 and e.type == 'NotFound':  # Collection does not exist
                     return
                 raise e
 
@@ -506,7 +512,8 @@ class RocksetAdapter(BaseAdapter):
                 logger.debug(f'{ws}.{cname} is ready!')
                 return
             else:
-                logger.debug(f'Waiting for collection {ws}.{cname} to become ready...')
+                logger.debug(
+                    f'Waiting for collection {ws}.{cname} to become ready...')
                 sleep(5)
 
     def _wait_until_docs(self, cname, ws, doc_count):
@@ -520,7 +527,8 @@ class RocksetAdapter(BaseAdapter):
                 logger.debug(f'{ws}.{cname} has {doc_count} docs!')
                 return
             else:
-                logger.debug(f'Waiting for collection {ws}.{cname} to have {doc_count} docs, it has {actual_count}...')
+                logger.debug(
+                    f'Waiting for collection {ws}.{cname} to have {doc_count} docs, it has {actual_count}...')
                 sleep(5)
 
     def _rs_collection_to_relation(self, collection):
@@ -552,7 +560,8 @@ class RocksetAdapter(BaseAdapter):
     def _wait_until_collection_deleted(self, ws, cname):
         while True:
             if self._does_collection_exist(ws, cname):
-                logger.debug(f'Waiting for collection {ws}.{cname} to be deleted')
+                logger.debug(
+                    f'Waiting for collection {ws}.{cname} to be deleted')
                 sleep(3)
             else:
                 break
@@ -567,7 +576,7 @@ class RocksetAdapter(BaseAdapter):
             self._wait_until_collection_deleted(ws, cname)
         except Exception as e:
             if e.code != 404 or e.type != 'NotFound':
-                raise e # Unexpected error
+                raise e  # Unexpected error
 
     def _delete_alias(self, rs, ws, alias):
         try:
@@ -579,4 +588,4 @@ class RocksetAdapter(BaseAdapter):
             self._wait_until_alias_deleted(ws, alias)
         except Exception as e:
             if e.code != 404 or e.type != 'NotFound':
-                raise e # Unexpected error
+                raise e  # Unexpected error
