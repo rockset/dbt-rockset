@@ -13,11 +13,17 @@ from rockset import Client, Q, F, sql
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 
+RS_APISERVERS = {
+    'us-west-2': 'api.rs2.usw2.rockset.com',
+    'us-east-1': 'api.use1a1.rockset.com'
+}
+
+
 @dataclass
 class RocksetCredentials(Credentials):
     api_key: str
     database: Optional[str]
-    api_server: Optional[str] = 'api.rs2.usw2.rockset.com'
+    region: Optional[str] = 'us-west-2'
 
     @property
     def type(self):
@@ -55,6 +61,13 @@ class RocksetConnectionManager(BaseConnectionManager):
 
         credentials = connection.credentials
 
+        # Ensure the credentials have a valid region before connecting to rockset
+        regions_str = ', '.join(list(RS_APISERVERS.keys()))
+        if credentials.region not in RS_APISERVERS:
+            raise dbt.exceptions.NotImplementedException(
+                f'Invalid region `{credentials.region}` specified in profile. Options are {regions_str}')
+
+        credentials.api_server = RS_APISERVERS[credentials.region]
         try:
             handle = sql.connect(
                 api_server=credentials.api_server,
