@@ -86,7 +86,7 @@ class RocksetAdapter(BaseAdapter):
                     break
                 logger.debug(
                     f'Waiting for ws {relation.schema} to have 0 collections, has {workspace.collection_count}')
-                sleep(5)
+                sleep(3)
 
             # Now delete the workspace
             rs.Workspace.delete(relation.schema)
@@ -206,31 +206,6 @@ class RocksetAdapter(BaseAdapter):
     # Special Rockset implementations
     ###
 
-    # Used to create seed tables for testing
-    @available.parse_none
-    def load_dataframe(self, database, schema, table_name, agate_table,
-                       column_override):
-        # Translate the agate table in json docs
-        json_results = []
-        for row in agate_table.rows:
-            d = dict(row.dict())
-            for k, v in d.items():
-                d[k] = str(v)
-            json_results.append(d)
-
-        # Create the Rockset collection
-        rs = self._rs_client()
-        c = rs.Collection.create(
-            table_name,
-            workspace=schema
-        )
-        self._wait_until_collection_ready(table_name, schema)
-
-        # Write the results to the collection and wait until the docs are ingested
-        expected_doc_count = len(json_results)
-        c.add_docs(json_results)
-        self._wait_until_docs(table_name, schema, expected_doc_count)
-
     def _wait_until_past_commit_fence(self, ws, cname, fence):
         endpoint = f'/v1/orgs/self/ws/{ws}/collections/{cname}/offsets/commit?fence={fence}'
         while True:
@@ -253,8 +228,7 @@ class RocksetAdapter(BaseAdapter):
             query_resp = self._send_rs_request('GET', endpoint)
             last_offset = json.loads(query_resp.text)['last_offset']
             if last_offset is not None:
-                self._wait_until_past_commit_fence(ws, cname, last_offset)
-                break
+                return last_offset
             else:
                 logger.debug(
                     f'Insert Into Query not yet finished processing; last offset not present')
@@ -290,7 +264,11 @@ class RocksetAdapter(BaseAdapter):
             {sql}
         '''
         iis_query_id = self._execute_query(insert_into_sql)
-        self._wait_until_iis_fully_ingested(ws, cname, iis_query_id)
+        self._wait_until_iis_query_processed(ws, cname, iis_query_id)
+
+    def _wait_until_iis_query_processed(self, ws, cname, query_id):
+        last_offset = self._wait_until_iis_fully_ingested(ws, cname, query_id)
+        self._wait_until_past_commit_fence(ws, cname, last_offset)
 
     def _send_rs_request(self, type, endpoint, body=None, check_success=True):
         url = self._rs_api_server() + endpoint
@@ -452,7 +430,7 @@ class RocksetAdapter(BaseAdapter):
             {sql}
         '''
         iis_query_id = self._execute_query(insert_into_sql)
-        self._wait_until_iis_fully_ingested(ws, cname, iis_query_id)
+        self._wait_until_iis_query_processed(ws, cname, iis_query_id)
 
     ###
     # Internal Rockset helper methods
@@ -488,7 +466,7 @@ class RocksetAdapter(BaseAdapter):
                 c = self._rs_client().Collection.retrieve(cname, workspace=ws)
                 logger.debug(
                     f'Waiting for collection {ws}.{cname} to be deleted...')
-                sleep(5)
+                sleep(3)
             except Exception as e:
                 if e.code == 404 and e.type == 'NotFound':  # Collection does not exist
                     return
@@ -514,22 +492,7 @@ class RocksetAdapter(BaseAdapter):
             else:
                 logger.debug(
                     f'Waiting for collection {ws}.{cname} to become ready...')
-                sleep(5)
-
-    def _wait_until_docs(self, cname, ws, doc_count):
-        while True:
-            c = self._rs_client().Collection.retrieve(
-                cname,
-                workspace=ws
-            )
-            actual_count = c.describe().data['stats']['doc_count']
-            if actual_count == doc_count:
-                logger.debug(f'{ws}.{cname} has {doc_count} docs!')
-                return
-            else:
-                logger.debug(
-                    f'Waiting for collection {ws}.{cname} to have {doc_count} docs, it has {actual_count}...')
-                sleep(5)
+                sleep(3)
 
     def _rs_collection_to_relation(self, collection):
         if collection is None:

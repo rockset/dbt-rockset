@@ -83,7 +83,7 @@ class RocksetConnectionManager(BaseConnectionManager):
             raise dbt.exceptions.FailedToConnectException(e)
 
     @classmethod
-    def get_status(cls, cursor):
+    def get_status(cls, cursor) -> str:
         # Rockset cursors don't have a status_message
         return 'OK'
 
@@ -104,9 +104,8 @@ class RocksetConnectionManager(BaseConnectionManager):
             '`commit` is not implemented for this adapter!'
         )
 
-    # Rockset does not implement transactions
     def clear_transaction(self) -> None:
-        logger.info(f'Clearing transaction')
+        pass
 
     # auto_begin is ignored in Rockset, and only included for consistency
     def execute(
@@ -150,5 +149,5 @@ class RocksetConnectionManager(BaseConnectionManager):
             raise e
 
     @classmethod
-    def get_response(cls, cursor):
+    def get_response(cls, cursor) -> str:
         return 'OK'
