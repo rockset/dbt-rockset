@@ -138,14 +138,14 @@ class RocksetAdapter(BaseAdapter):
         )
 
     @available.parse(lambda *a, **k: '')
-    def get_alias(self, relation) -> RocksetRelation:
+    def get_collection(self, relation) -> RocksetRelation:
         ws = relation.schema
-        alias = relation.identifier
+        cname = relation.identifier
 
         try:
             rs = self._rs_client()
-            existing_alias = rs.Alias.retrieve(alias, workspace=ws)
-            return self._rs_alias_to_relation(existing_alias)
+            existing_collection = rs.Collection.retrieve(cname, workspace=ws)
+            return self._rs_collection_to_relation(existing_collection)
         except Exception as e:
             if e.code == 404 and e.type == 'NotFound': # Collection does not exist
                 return None
@@ -159,17 +159,17 @@ class RocksetAdapter(BaseAdapter):
         # get Rockset client to use Rockset's Python API
         rs = self._rs_client()
         if schema_relation and schema_relation.identifier and schema_relation.schema:
-            aliases = [rs.Alias.retrieve(
+            collections = [rs.Collection.retrieve(
                 schema_relation.identifier,
                 workspace=schema_relation.schema,
             )]
         else:
-            aliases = rs.Alias.list()
+            collections = rs.Collection.list()
 
-        # map Rockset aliases to RocksetRelation
+        # map Rockset collections to RocksetRelation
         relations = []
-        for alias in aliases:
-            relations.append(self._rs_alias_to_relation(alias))
+        for collection in collections:
+            relations.append(self._rs_collection_to_relation(collection))
 
         return relations
 
@@ -236,14 +236,6 @@ class RocksetAdapter(BaseAdapter):
         c.add_docs(json_results)
         self._wait_until_docs(table_name, schema, expected_doc_count)
 
-    def _create_alias(self, rs, alias, cpath):
-        logger.debug(f'Creating alias {alias} on collection {cpath}')
-        rs.Alias.create(
-            name=alias,
-            workspace=cpath.split('.')[0],
-            collections=[cpath]
-        )
-
     def _wait_until_past_commit_fence(self, ws, cname, fence):
         endpoint = f'/v1/orgs/self/ws/{ws}/collections/{cname}/offsets/commit?fence={fence}'
         while True:
@@ -275,56 +267,30 @@ class RocksetAdapter(BaseAdapter):
     @available.parse(lambda *a, **k: '')
     def create_table(self, relation, sql):
         ws = relation.schema
-
-        if self._does_view_exist(ws, relation.identifier):
-            self._delete_view_recursively(ws, relation.identifier)
-
-        current_millis = round(time() * 1000)
-        cname_new = f'{relation.identifier}_{current_millis}'
-        cpath = f'{ws}.{cname_new}'
-
-        logger.debug(f'Creating collection {ws}.{cname_new}')
+        cname = relation.identifier
         rs = self._rs_client()
 
+        if self._does_alias_exist(ws, cname):
+            self._delete_alias(rs, ws, cname)
+
+        if self._does_view_exist(ws, cname):
+            self._delete_view_recursively(ws, cname)
+
+        logger.debug(f'Creating collection {ws}.{cname}')
+
         c = rs.Collection.create(
-            cname_new,
+            cname,
             workspace=ws
         )
-        self._wait_until_collection_ready(cname_new, ws)
+        self._wait_until_collection_ready(cname, ws)
 
         # Run an INSERT INTO statement and wait for it to be fully ingested
         insert_into_sql = f'''
-            INSERT INTO {ws}.{cname_new}
+            INSERT INTO {ws}.{cname}
             {sql}
         '''
         iis_query_id = self._execute_query(insert_into_sql)
-        self._wait_until_iis_fully_ingested(ws, cname_new, iis_query_id)
-
-        # Now we have a timestamp tagged table. Make sure that an alias named
-        # relation.identifier is pointing to it
-        alias_name = relation.identifier
-
-        try:
-            alias = rs.Alias.retrieve(alias_name, workspace=ws)
-
-            old_collections = alias.collections
-            alias.update(collections=[cpath])
-
-            # Drop any collections previously referenced by the alias
-            for collection in old_collections:
-                try:
-                    ws, cname = collection.split('.')
-                    rs.Collection.retrieve(
-                        cname,
-                        workspace=ws
-                    ).drop()
-                except Exception as e:
-                    logger.warn(f'Failed to drop {ws}.{cname}. Continuing...')
-        except Exception as e:
-            if e.code == 404:
-                self._create_alias(rs, alias_name, cpath)
-            else:
-                raise e
+        self._wait_until_iis_fully_ingested(ws, cname, iis_query_id)
 
     def _send_rs_request(self, type, endpoint, body=None, check_success=True):
         url = self._rs_api_server() + endpoint
@@ -469,80 +435,6 @@ class RocksetAdapter(BaseAdapter):
         sleep(3)
 
     @available.parse(lambda *a, **k: '')
-    def create_table_from_external(self, schema, identifier, options):
-        if not options:
-            raise dbt.exceptions.CompilationException('Must provide options')
-
-        if 'integration_name' not in options or 'bucket' not in options:
-            raise dbt.exceptions.CompilationException('Must provide `integration_name` and `bucket` in options')
-        iname = options['integration_name']
-        rs = self._rs_client()
-
-        # First, create the workspace if it doesn't exist
-        try:
-            rs.Workspace.retrieve(schema)
-        except Exception as e:
-            if e.code == 404 and e.type == 'NotFound':
-                rs.Workspace.create(schema)
-            else: # Unexpected error
-                raise e
-
-        integration = rs.Integration.retrieve(iname)
-        if not integration['s3']:
-            raise dbt.exceptions.CompilationException('Integration must be S3 type')
-        bucket = options['bucket']
-
-        prefix_key = 'ROCKSET_S3_STAGE_PREFIX'
-        if prefix_key not in os.environ:
-            raise Exception(f'Must provide {prefix_key} as an env variable')
-        prefix = os.environ[prefix_key]
-
-        # The alias that points to the collection uses the identifier name, the collection
-        # uses the identifier with a timestamp
-        alias_name = identifier
-        cname = identifier + '_' + str(int(round(time())))
-
-        format_params = options['format_params'] if 'format_params' in options else None
-        s3 = rs.Source.s3(
-            bucket=bucket,
-            prefix=prefix,
-            integration=integration,
-            format_params=format_params
-        )
-
-        newcoll = rs.Collection.create(name=cname, workspace=schema, sources=[s3])
-        self._wait_until_collection_ready(cname, schema)
-
-        # By default, wait 5 minutes after dump
-        wait_seconds_before_switch = options['wait_seconds_before_switch'] if 'wait_seconds_before_switch' in options else 300
-        logger.debug(f'Waiting {wait_seconds_before_switch} seconds before switching the alias to the new collection')
-        sleep(wait_seconds_before_switch)
-
-        collection_path = schema + '.' + cname
-        try:
-            alias = rs.Alias.retrieve(alias_name, workspace=schema)
-
-            # If the alias is found, point it to the new collection and delete the old collection
-            collections_to_drop = alias.collections
-            alias.update(collections=[collection_path])
-
-            # Wait 2 minutes before dropping the old collections, to be sure the alias has switched over
-            sleep(120)
-
-            for collection_path in collections_to_drop:
-                dropping_ws, dropping_cname = collection_path.split('.')
-                self._drop_collection(rs, dropping_ws, dropping_cname)
-        except Exception as e:
-            # If not found, create it and point it to the collection
-            if e.code == 404 and e.type == 'NotFound':
-                rs.Alias.create(
-                    alias_name,
-                    workspace=schema,
-                    collections=[collection_path])
-            else: # Unexpected error
-                raise e
-
-    @available.parse(lambda *a, **k: '')
     def add_incremental_docs(self, relation, sql, unique_key):
         if unique_key and unique_key != '_id':
             raise dbt.exceptions.NotImplementedException(
@@ -550,23 +442,7 @@ class RocksetAdapter(BaseAdapter):
             )
 
         ws = relation.schema
-        alias = relation.identifier
-
-        rs = self._rs_client()
-        existing_alias = rs.Alias.retrieve(alias, workspace=ws)
-        cname = None
-        for cpath in existing_alias.collections:
-            collection_ws, collection = cpath.split('.')
-            if ws == collection_ws and collection.startswith(alias):
-                if cname is not None:
-                    raise dbt.exceptions.Exception(f'Found multiple eligible collections referenced by {alias}; there may only be one')
-                else:
-                    cname = collection
-
-        if cname is None:
-            raise dbt.exceptions.Exception(
-                f'Found no eligible collection referenced by {alias}; the referenced collection should be in the target ws, and be prefixed with the alias name'
-            )
+        cname = relation.identifier
 
         # Run an INSERT INTO statement and wait for it to be fully ingested
         insert_into_sql = f'''
@@ -650,7 +526,7 @@ class RocksetAdapter(BaseAdapter):
                 logger.debug(f'Waiting for collection {ws}.{cname} to have {doc_count} docs, it has {actual_count}...')
                 sleep(5)
 
-    def _rs_alias_to_relation(self, collection):
+    def _rs_collection_to_relation(self, collection):
         if collection is None:
             return None
 
