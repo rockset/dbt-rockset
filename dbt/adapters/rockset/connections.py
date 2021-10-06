@@ -2,7 +2,6 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from dbt.adapters.base import Credentials
 from dbt.adapters.base import BaseConnectionManager
-from dbt.adapters.rockset.util import sql_to_json_results
 from dbt.clients import agate_helper
 from dbt.contracts.connection import AdapterResponse, Connection
 from dbt.logger import GLOBAL_LOGGER as logger
@@ -104,14 +103,31 @@ class RocksetConnectionManager(BaseConnectionManager):
         cursor = self.get_thread_connection().handle.cursor()
 
         if fetch:
-            json_results = sql_to_json_results(cursor, sql)
-            table = agate.Table.from_object(json_results)
+            rows, field_names = self._sql_to_results(cursor, sql)
+            table = agate_helper.table_from_data_flat(rows, field_names)
         else:
             cursor.execute(sql)
             table = agate_helper.empty_table()
 
         return AdapterResponse(_message='OK'), table
 
+    def _sql_to_results(self, cursor, sql):
+        cursor.execute(sql)
+        field_names = self._description_to_field_names(cursor.description)
+        json_results = []
+        rows = cursor.fetchall()
+        for row in rows:
+            json_results.append(self._row_to_json(row, field_names))
+        return json_results, field_names
+
+    def _row_to_json(self, row, field_names):
+        json_res = {}
+        for i in range(len(row)):
+            json_res[field_names[i]] = row[i]
+        return json_res
+
+    def _description_to_field_names(self, description):
+        return [desc[0] for desc in description]
 
     @contextmanager
     def exception_handler(self, sql: str):

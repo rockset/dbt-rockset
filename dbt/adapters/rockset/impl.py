@@ -5,7 +5,6 @@ from dbt.adapters.sql import SQLAdapter
 from dbt.adapters.rockset.connections import RocksetConnectionManager
 from dbt.adapters.rockset.relation import RocksetRelation
 from dbt.adapters.rockset.column import RocksetColumn
-from dbt.adapters.rockset.util import sql_to_json_results
 from dbt.logger import GLOBAL_LOGGER as logger
 
 import agate
