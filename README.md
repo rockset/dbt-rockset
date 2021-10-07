@@ -17,9 +17,9 @@ rockset:
   outputs:
     dev:
       type: rockset
-      database: N/A
       workspace: <rockset_workspace_name>
       api_key: <rockset_api_key>
+      region: <rockset_region> # This is optional. The default is us-west-2
   target: dev
 ```
 
