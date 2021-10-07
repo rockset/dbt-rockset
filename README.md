@@ -23,19 +23,16 @@ rockset:
   target: dev
 ```
 
-Note that the `database` field is included in the profile, as this field is required by dbt-core. But Rockset does not have the typical concept of databases, so this value is not important.
-
 ## Supported Features
 
 ### Materializations
 
 Type | Supported? | Details
 -----|------------|----------------
-table | YES | Creates a [Rockset collection](https://docs.rockset.com/collections/)
-view | NO | Support coming soon
-materializedview | NO | Support coming soon
-ephemeral | NO | Support coming soon
-incremental | NO | Support coming soon
+table | YES | Creates a [Rockset collection](https://docs.rockset.com/collections/).
+view | YES | Creates a [Rockset view](https://rockset.com/docs/views/#gatsby-focus-wrapper).
+ephemeral | Yes | Create a CTE.
+incremental | YES | Creates a [Rockset collection](https://docs.rockset.com/collections/) if it doesn't exist, and writes to it.
 
 ### Formatting
 
