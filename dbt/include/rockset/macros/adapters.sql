@@ -13,7 +13,3 @@
 {% macro ref(modelname) %}
   {{ builtins.ref(modelname).include(database=False).render() }}
 {% endmacro %}
-{% macro source(source_name, table_name) %}
-  {% set rel = builtins.source(source_name, table_name).include(database=False).render() %}
-  {% do return(rel) %}
-{% endmacro %}
