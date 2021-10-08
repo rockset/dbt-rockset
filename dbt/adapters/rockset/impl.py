@@ -19,6 +19,10 @@ from time import sleep, time
 from typing import List
 
 
+OK = 200
+NOT_FOUND = 404
+
+
 class RocksetAdapter(BaseAdapter):
     RELATION_TYPES = {
         'TABLE': RelationType.Table,
@@ -103,23 +107,10 @@ class RocksetAdapter(BaseAdapter):
             rs.Workspace.delete(ws)
         except Exception as e:
             logger.debug(f'Caught exception of type {e.__class__}')
-            if isinstance(e, rockset.exception.Error) and e.code == 404 and e.type == 'NotFound':  # Workspace does not exist
+            if isinstance(e, rockset.exception.Error) and e.code == NOT_FOUND:  # Workspace does not exist
                 pass
             else: # Unexpected error
                 raise e
-
-    
-
-    # @available.parse(lambda *a, **k: False)
-    # def check_schema_exists(self, database: str, schema: str) -> bool:
-    #     logger.debug(f'Checking if schema {schema} exists')
-    #     rs = self._rs_client()
-    #     try:
-    #         _ = rs.Workspace.retrieve(schema)
-    #         return True
-    #     except:
-    #         pass
-    #     return False
 
     # Required by BaseAdapter
     @available
@@ -156,7 +147,7 @@ class RocksetAdapter(BaseAdapter):
             existing_collection = rs.Collection.retrieve(cname, workspace=ws)
             return self._rs_collection_to_relation(existing_collection)
         except Exception as e:
-            if e.code == 404 and e.type == 'NotFound':  # Collection does not exist
+            if e.code == NOT_FOUND:  # Collection does not exist
                 return None
             else:  # Unexpected error
                 raise e
@@ -377,12 +368,12 @@ class RocksetAdapter(BaseAdapter):
     def _does_view_exist(self, ws, view):
         endpoint = self._views_endpoint(ws) + f'/{view}'
         response = self._send_rs_request('GET', endpoint, check_success=False)
-        if response.status_code == 404:
+        if response.status_code == NOT_FOUND:
             return False
-        elif response.status_code == 200:
+        elif response.status_code == OK:
             return True
         else:
-            raise Exception(response.text)
+            raise Exception(f'throwing from 332 with status_code {response.status_code} and text {response.text}')
 
     def _does_alias_exist(self, ws, alias):
         rs = self._rs_client()
@@ -393,7 +384,7 @@ class RocksetAdapter(BaseAdapter):
             )
             return True
         except Exception as e:
-            if isinstance(e, rockset.exception.InputError) and e.code == 404:
+            if isinstance(e, rockset.exception.InputError) and e.code == NOT_FOUND:
                 return False
             else:
                 raise e
@@ -407,7 +398,7 @@ class RocksetAdapter(BaseAdapter):
             )
             return True
         except Exception as e:
-            if isinstance(e, rockset.exception.InputError) and e.code == 404:
+            if isinstance(e, rockset.exception.InputError) and e.code == NOT_FOUND:
                 return False
             else:
                 raise e
@@ -435,14 +426,13 @@ class RocksetAdapter(BaseAdapter):
             self._delete_view_recursively(ref_view[0], ref_view[1])
 
         endpoint = f'{self._views_endpoint(ws)}/{view}'
-        try:
-            view_resp = self._send_rs_request('GET', endpoint)
-            view_json = json.loads(view_resp.text)
-            resp = self._send_rs_request('DELETE', endpoint)
-            self._wait_until_view_does_not_exist(ws, view)
-        except Exception as e:
-            if e.code != 404 or e.type != 'NotFound':
-                raise e  # Unexpected error
+        del_resp = self._send_rs_request('DELETE', endpoint)
+        if del_resp.status_code == NOT_FOUND:
+            return
+        elif del_resp.status_code != OK:
+            raise Exception(f'throwing from 395 with code {del_resp.status_code} and text {del_resp.text}')
+
+        self._wait_until_view_does_not_exist(ws, view)
 
     def _get_referencing_views(self, ws, view):
         view_path = f'{ws}.{view}'
@@ -541,7 +531,7 @@ class RocksetAdapter(BaseAdapter):
         endpoint = '/v1/orgs/self/queries'
         body = {'sql': {'query': sql}}
         resp = self._send_rs_request('POST', endpoint, body=body)
-        if resp.status_code != 200:
+        if resp.status_code != OK:
             raise dbt.exceptions.Exception(resp.text)
 
         return json.loads(resp.text)['query_id']
@@ -554,7 +544,7 @@ class RocksetAdapter(BaseAdapter):
                     f'Waiting for collection {ws}.{cname} to be deleted...')
                 sleep(3)
             except Exception as e:
-                if e.code == 404 and e.type == 'NotFound':  # Collection does not exist
+                if e.code == NOT_FOUND:  # Collection does not exist
                     return
                 raise e
 
@@ -616,17 +606,17 @@ class RocksetAdapter(BaseAdapter):
                 break
 
     def _delete_collection(self, rs, ws, cname, wait_until_deleted=True):
-        try:
-            for ref_view in self._get_referencing_views(ws, cname):
-                self._delete_view_recursively(ref_view[0], ref_view[1])
+        for ref_view in self._get_referencing_views(ws, cname):
+            self._delete_view_recursively(ref_view[0], ref_view[1])
 
+        try:
             c = rs.Collection.retrieve(cname, workspace=ws)
             c.drop()
             
             if wait_until_deleted:
                 self._wait_until_collection_deleted(ws, cname)
         except Exception as e:
-            if e.code != 404 or e.type != 'NotFound':
+            if e.code != NOT_FOUND:
                 raise e  # Unexpected error
 
     def _delete_alias(self, rs, ws, alias):
@@ -638,5 +628,5 @@ class RocksetAdapter(BaseAdapter):
             a.drop()
             self._wait_until_alias_deleted(ws, alias)
         except Exception as e:
-            if e.code != 404 or e.type != 'NotFound':
+            if e.code != NOT_FOUND:
                 raise e  # Unexpected error
