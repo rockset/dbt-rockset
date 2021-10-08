@@ -1,0 +1,371 @@
+versions pytest-6.2.5, py-1.10.0, python-3.6.9.final.0
+cwd=/data/home/sam/dbt/dbt-rockset
+args=('--debug', 'dbt-rockset/test/rockset.dbtspec')
+
+  pytest_cmdline_main [hook]
+      config: <_pytest.config.Config object at 0x7efe50efc128>
+    pytest_plugin_registered [hook]
+        plugin: <Session dbt-rockset exitstatus='<UNSET>' testsfailed=0 testscollected=0>
+        manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+    finish pytest_plugin_registered --> [] [hook]
+    pytest_configure [hook]
+        config: <_pytest.config.Config object at 0x7efe50efc128>
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.cacheprovider.LFPlugin object at 0x7efe50eb56a0>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.cacheprovider.NFPlugin object at 0x7efe50eb5a90>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+    early skip of rewriting module: faulthandler [assertion]
+      pytest_configure [hook]
+          config: <_pytest.config.Config object at 0x7efe50efc128>
+      finish pytest_configure --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.faulthandler.FaultHandlerHooks object at 0x7efe50eb5470>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+    early skip of rewriting module: pdb [assertion]
+    early skip of rewriting module: cmd [assertion]
+    early skip of rewriting module: code [assertion]
+    early skip of rewriting module: codeop [assertion]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.config.Config object at 0x7efe50efc128>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.mark' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/mark/__init__.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.main' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/main.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.runner' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/runner.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.fixtures' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/fixtures.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.helpconfig' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/helpconfig.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.python' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/python.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.terminal' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/terminal.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.debugging' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/debugging.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.unittest' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/unittest.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.capture' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/capture.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.skipping' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/skipping.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.tmpdir' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/tmpdir.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.monkeypatch' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/monkeypatch.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.recwarn' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/recwarn.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.pastebin' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/pastebin.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.nose' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/nose.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.assertion' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/assertion/__init__.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.junitxml' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/junitxml.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.doctest' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/doctest.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.cacheprovider' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/cacheprovider.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.freeze_support' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/freeze_support.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.setuponly' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/setuponly.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.setupplan' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/setupplan.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.stepwise' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/stepwise.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.warnings' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/warnings.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.logging' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/logging.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.reports' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/reports.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.faulthandler' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/faulthandler.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module 'pytest_dbt_adapter' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/pytest_dbt_adapter/__init__.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <CaptureManager _method='fd' _global_capturing=<MultiCapture out=<FDCapture 1 oldfd=5 _state='suspended' tmpfile=<_io.TextIOWrapper name="<_io.FileIO name=6 mode='rb+' closefd=True>" mode='r+' encoding='utf-8'>> err=<FDCapture 2 oldfd=7 _state='suspended' tmpfile=<_io.TextIOWrapper name="<_io.FileIO name=8 mode='rb+' closefd=True>" mode='r+' encoding='utf-8'>> in_=<FDCapture 0 oldfd=3 _state='started' tmpfile=<_io.TextIOWrapper name='/dev/null' mode='r' encoding='UTF-8'>> _state='suspended' _in_suspended=False> _capture_fixture=None>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <Session dbt-rockset exitstatus=<ExitCode.OK: 0> testsfailed=0 testscollected=0>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.cacheprovider.LFPlugin object at 0x7efe50eb56a0>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.cacheprovider.NFPlugin object at 0x7efe50eb5a90>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.faulthandler.FaultHandlerHooks object at 0x7efe50eb5470>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.terminal.TerminalReporter object at 0x7efe4f1517f0>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.logging.LoggingPlugin object at 0x7efe4f0fc630>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+    finish pytest_configure --> [] [hook]
+    pytest_sessionstart [hook]
+        session: <Session dbt-rockset exitstatus=<ExitCode.OK: 0> testsfailed=0 testscollected=0>
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.config.Config object at 0x7efe50efc128>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.mark' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/mark/__init__.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.main' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/main.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.runner' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/runner.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.fixtures' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/fixtures.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.helpconfig' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/helpconfig.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.python' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/python.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.terminal' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/terminal.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.debugging' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/debugging.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.unittest' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/unittest.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.capture' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/capture.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.skipping' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/skipping.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.tmpdir' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/tmpdir.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.monkeypatch' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/monkeypatch.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.recwarn' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/recwarn.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.pastebin' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/pastebin.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.nose' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/nose.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.assertion' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/assertion/__init__.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.junitxml' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/junitxml.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.doctest' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/doctest.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.cacheprovider' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/cacheprovider.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.freeze_support' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/freeze_support.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.setuponly' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/setuponly.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.setupplan' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/setupplan.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.stepwise' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/stepwise.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.warnings' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/warnings.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.logging' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/logging.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.reports' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/reports.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.faulthandler' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/_pytest/faulthandler.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module 'pytest_dbt_adapter' from '/data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/pytest_dbt_adapter/__init__.py'>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <CaptureManager _method='fd' _global_capturing=<MultiCapture out=<FDCapture 1 oldfd=5 _state='suspended' tmpfile=<_io.TextIOWrapper name="<_io.FileIO name=6 mode='rb+' closefd=True>" mode='r+' encoding='utf-8'>> err=<FDCapture 2 oldfd=7 _state='suspended' tmpfile=<_io.TextIOWrapper name="<_io.FileIO name=8 mode='rb+' closefd=True>" mode='r+' encoding='utf-8'>> in_=<FDCapture 0 oldfd=3 _state='started' tmpfile=<_io.TextIOWrapper name='/dev/null' mode='r' encoding='UTF-8'>> _state='suspended' _in_suspended=False> _capture_fixture=None>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <Session dbt-rockset exitstatus=<ExitCode.OK: 0> testsfailed=0 testscollected=0>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.cacheprovider.LFPlugin object at 0x7efe50eb56a0>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.cacheprovider.NFPlugin object at 0x7efe50eb5a90>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.faulthandler.FaultHandlerHooks object at 0x7efe50eb5470>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.terminal.TerminalReporter object at 0x7efe4f1517f0>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.logging.LoggingPlugin object at 0x7efe4f0fc630>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.fixtures.FixtureManager object at 0x7efe50eb5390>
+          manager: <_pytest.config.PytestPluginManager object at 0x7efe5372eeb8>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_report_header [hook]
+          config: <_pytest.config.Config object at 0x7efe50efc128>
+          startdir: /data/home/sam/dbt/dbt-rockset
+      finish pytest_report_header --> [['rootdir: /data/home/sam/dbt/dbt-rockset', 'plugins: dbt-adapter-0.5.1'], ['using: pytest-6.2.5 pylib-1.10.0', 'setuptools registered plugins:', '  pytest-dbt-adapter-0.5.1 at /data/home/sam/dbt/dbt-env/lib/python3.6/site-packages/pytest_dbt_adapter/__init__.py']] [hook]
+    finish pytest_sessionstart --> [] [hook]
+    pytest_collection [hook]
+        session: <Session dbt-rockset exitstatus=<ExitCode.OK: 0> testsfailed=0 testscollected=0>
+    perform_collect <Session dbt-rockset exitstatus=<ExitCode.OK: 0> testsfailed=0 testscollected=0> ['dbt-rockset/test/rockset.dbtspec'] [collection]
+        pytest_collection_finish [hook]
+            session: <Session dbt-rockset exitstatus=<ExitCode.OK: 0> testsfailed=0 testscollected=0>
+          pytest_report_collectionfinish [hook]
+              config: <_pytest.config.Config object at 0x7efe50efc128>
+              startdir: /data/home/sam/dbt/dbt-rockset
+              items: []
+          finish pytest_report_collectionfinish --> [] [hook]
+        finish pytest_collection_finish --> [] [hook]
+      pytest_sessionfinish [hook]
+          session: <Session dbt-rockset exitstatus=<ExitCode.USAGE_ERROR: 4> testsfailed=0 testscollected=0>
+          exitstatus: 4
+        pytest_terminal_summary [hook]
+            terminalreporter: <_pytest.terminal.TerminalReporter object at 0x7efe4f1517f0>
+            exitstatus: 4
+            config: <_pytest.config.Config object at 0x7efe50efc128>
+        finish pytest_terminal_summary --> [] [hook]
+      finish pytest_sessionfinish --> [] [hook]
+      pytest_unconfigure [hook]
+          config: <_pytest.config.Config object at 0x7efe50efc128>
+      finish pytest_unconfigure --> [] [hook]

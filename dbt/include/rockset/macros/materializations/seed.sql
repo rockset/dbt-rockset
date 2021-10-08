@@ -5,7 +5,6 @@
   {%- set old_relation = adapter.get_relation(database=database, schema=schema, identifier=identifier) -%}
   {%- set full_refresh_mode = (should_full_refresh()) -%}
 
-  {%- set exists_as_table = (old_relation is not none and old_relation.is_table) -%}
   {%- set exists_as_view = (old_relation is not none and old_relation.is_view) -%}
 
   {%- set agate_table = load_agate_table() -%}
@@ -14,17 +13,11 @@
   {{ run_hooks(pre_hooks, inside_transaction=False) }}
   {{ run_hooks(pre_hooks, inside_transaction=True) }}
 
-  {% set create_table_sql = "" %}
   {% if exists_as_view %}
     {{ exceptions.raise_compiler_error("Cannot seed to '{}', it is a view".format(old_relation)) }}
-  {% elif exists_as_table %}
-    {% set create_table_sql = reset_csv_table(model, full_refresh_mode, old_relation, agate_table) %}
-  {% else %}
-    {% set create_table_sql = create_csv_table(model, agate_table) %}
   {% endif %}
   {% set sql = load_csv_rows(model, agate_table) %}
 
-  {#-- Rockset does not support CREATE TABLE sql. All logic to create collections happens in create_table_as --#}
   {% call statement('main') -%}
     {{ "SELECT 1" }}
   {%- endcall %}
@@ -38,10 +31,6 @@
   {{ return({'relations': [target_relation]}) }}
 
 {% endmaterialization %}
-
-{% macro rockset__create_csv_table(model, agate_table) %}
-    -- no-op
-{% endmacro %}
 
 {% macro rockset__reset_csv_table(model, full_refresh, old_relation, agate_table) %}
     {{ adapter.drop_relation(old_relation) }}

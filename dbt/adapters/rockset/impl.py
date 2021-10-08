@@ -67,49 +67,53 @@ class RocksetAdapter(BaseAdapter):
     def date_function(cls):
         return "CURRENT_TIMESTAMP()"
 
-    # Schema/workspace related methods
+    # Required by BaseAdapter
     def create_schema(self, relation: RocksetRelation) -> None:
         rs = self._rs_client()
         logger.debug('Creating workspace "{}"', relation.schema)
         rs.Workspace.create(relation.schema)
 
+    # Required by BaseAdapter
     def drop_schema(self, relation: RocksetRelation) -> None:
         rs = self._rs_client()
-        logger.debug('Dropping workspace "{}"', relation.schema)
+        ws = relation.schema
+        logger.info('Dropping workspace "{}"', ws)
+        
+        # Drop all collections in the ws
+        for collection in rs.Collection.list(workspace=ws):
+            self._delete_collection(rs, ws, collection.name)
+
+        # Drop all views in the ws
+        for view in self._list_views(ws):
+            self._delete_view_recursively(rs, view)
+
+        # Drop all aliases in the ws
+        for alias in rs.Alias.list(workspace=ws):
+            self._delete_alias(rs, ws, alias.name)
+
         try:
-            # Drop all collections in the ws
-            for collection in rs.Collection.list(workspace=relation.schema):
-                collection.drop()
-
-            # Wait until the ws has 0 collections
-            while True:
-                workspace = rs.Workspace.retrieve(relation.schema)
-                if workspace.collection_count == 0:
-                    break
-                logger.debug(
-                    f'Waiting for ws {relation.schema} to have 0 collections, has {workspace.collection_count}')
-                sleep(3)
-
             # Now delete the workspace
-            rs.Workspace.delete(relation.schema)
+            rs.Workspace.delete(ws)
         except Exception as e:
             if e.code == 404 and e.type == 'NotFound':  # Workspace does not exist
                 return None
             else:  # Unexpected error
                 raise e
 
-    @available.parse(lambda *a, **k: False)
-    def check_schema_exists(self, database: str, schema: str) -> bool:
-        logger.debug(f'Checking if schema {schema} exists')
-        rs = self._rs_client()
-        try:
-            _ = rs.Workspace.retrieve(schema)
-            return True
-        except:
-            pass
+    
 
-        return False
+    # @available.parse(lambda *a, **k: False)
+    # def check_schema_exists(self, database: str, schema: str) -> bool:
+    #     logger.debug(f'Checking if schema {schema} exists')
+    #     rs = self._rs_client()
+    #     try:
+    #         _ = rs.Workspace.retrieve(schema)
+    #         return True
+    #     except:
+    #         pass
+    #     return False
 
+    # Required by BaseAdapter
     @available
     def list_schemas(self, database: str) -> List[str]:
         rs = self._rs_client()
@@ -149,6 +153,7 @@ class RocksetAdapter(BaseAdapter):
             else:  # Unexpected error
                 raise e
 
+    # Required by BaseAdapter
     def list_relations_without_caching(
         self, schema_relation: RocksetRelation
     ) -> List[RocksetRelation]:
@@ -167,10 +172,9 @@ class RocksetAdapter(BaseAdapter):
         relations = []
         for collection in collections:
             relations.append(self._rs_collection_to_relation(collection))
-
         return relations
 
-    # Columns/fields related methods
+    # Required by BaseAdapter
     def get_columns_in_relation(
         self, relation: RocksetRelation
     ) -> List[RocksetColumn]:
@@ -183,7 +187,6 @@ class RocksetAdapter(BaseAdapter):
             if len(row['field']) == 1:
                 col = self.Column.create(row['field'][0], row['type'])
                 columns.append(col)
-
         return columns
 
     def _get_types_in_relation(
@@ -306,6 +309,33 @@ class RocksetAdapter(BaseAdapter):
         iis_query_id = self._execute_query(insert_into_sql)
         self._wait_until_iis_query_processed(ws, cname, iis_query_id)
 
+    # Used only for dbt adapter tests
+    @available.parse_none
+    def load_dataframe(self, database, schema, table_name, agate_table, column_override):
+        # Translate the agate table in json docs
+        json_docs = []
+        for row in agate_table.rows:
+            d = dict(row.dict())
+            for k, v in d.items():
+                d[k] = str(v)
+            json_docs.append(d)
+
+        # Create the Rockset collection
+        rs = self._rs_client()
+        c = rs.Collection.create(
+            table_name,
+            workspace=schema
+        )
+        self._wait_until_collection_ready(table_name, schema)
+
+        # Write the results to the collection and wait until the docs are ingested
+        expected_doc_count = len(json_docs)
+        c.add_docs(json_docs)
+
+        # TODO(sam): After code push next, change this to using the write api last_offset
+        # For now, just sleep 15s to ensure full ingest
+        sleep(15)
+
     def _wait_until_iis_query_processed(self, ws, cname, query_id):
         last_offset = self._wait_until_iis_fully_ingested(ws, cname, query_id)
         self._wait_until_past_commit_fence(ws, cname, last_offset)
@@ -330,6 +360,11 @@ class RocksetAdapter(BaseAdapter):
 
     def _views_endpoint(self, ws):
         return f'/v1/orgs/self/ws/{ws}/views'
+
+    def _list_views(self, ws):
+        endpoint = self._views_endpoint(ws)
+        resp_json = json.loads(self._send_rs_request('GET', endpoint).text)
+        return [v.name for v in resp_json['data']]
 
     def _does_view_exist(self, ws, view):
         endpoint = self._views_endpoint(ws) + f'/{view}'
@@ -392,11 +427,14 @@ class RocksetAdapter(BaseAdapter):
             self._delete_view_recursively(ref_view[0], ref_view[1])
 
         endpoint = f'{self._views_endpoint(ws)}/{view}'
-        view_resp = self._send_rs_request('GET', endpoint)
-        view_json = json.loads(view_resp.text)
-        resp = self._send_rs_request('DELETE', endpoint)
-
-        self._wait_until_view_does_not_exist(ws, view)
+        try:
+            view_resp = self._send_rs_request('GET', endpoint)
+            view_json = json.loads(view_resp.text)
+            resp = self._send_rs_request('DELETE', endpoint)
+            self._wait_until_view_does_not_exist(ws, view)
+        except Exception as e:
+            if e.code != 404 or e.type != 'NotFound':
+                raise e  # Unexpected error
 
     def _get_referencing_views(self, ws, view):
         view_path = f'{ws}.{view}'
@@ -582,10 +620,10 @@ class RocksetAdapter(BaseAdapter):
                 raise e  # Unexpected error
 
     def _delete_alias(self, rs, ws, alias):
-        try:
-            for ref_view in self._get_referencing_views(ws, alias):
-                self._delete_view_recursively(ref_view[0], ref_view[1])
+        for ref_view in self._get_referencing_views(ws, alias):
+            self._delete_view_recursively(ref_view[0], ref_view[1])
 
+        try:
             a = rs.Alias.retrieve(alias, workspace=ws)
             a.drop()
             self._wait_until_alias_deleted(ws, alias)
