@@ -6,8 +6,8 @@ import traceback
 @dataclass
 class RocksetQuotePolicy(Policy):
     database: bool = False
-    schema: bool = False
-    identifier: bool = False
+    schema: bool = True
+    identifier: bool = True
 
 
 @dataclass(frozen=True, eq=False, repr=False)
