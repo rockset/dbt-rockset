@@ -67,21 +67,15 @@ class RocksetAdapter(BaseAdapter):
     def date_function(cls):
         return "CURRENT_TIMESTAMP()"
 
-    # Required by BaseAdapter
     def create_schema(self, relation: RocksetRelation) -> None:
         rs = self._rs_client()
         logger.debug('Creating workspace "{}"', relation.schema)
         rs.Workspace.create(relation.schema)
 
-    # Required by BaseAdapter
     def drop_schema(self, relation: RocksetRelation) -> None:
         rs = self._rs_client()
         ws = relation.schema
         logger.info('Dropping workspace "{}"', ws)
-        
-        # Drop all collections in the ws
-        for collection in rs.Collection.list(workspace=ws):
-            self._delete_collection(rs, ws, collection.name)
 
         # Drop all views in the ws
         for view in self._list_views(ws):
@@ -91,13 +85,27 @@ class RocksetAdapter(BaseAdapter):
         for alias in rs.Alias.list(workspace=ws):
             self._delete_alias(rs, ws, alias.name)
 
+        # Drop all collections in the ws
+        for collection in rs.Collection.list(workspace=ws):
+            self._delete_collection(rs, ws, collection.name, wait_until_deleted=False)
+
         try:
-            # Now delete the workspace
+            # Wait until the ws has 0 collections. We do this so deletion of multiple collections
+            # can happen in parallel
+            while True:
+                workspace = rs.Workspace.retrieve(ws)
+                if workspace.collection_count == 0:
+                    break
+                logger.debug(
+                    f'Waiting for ws {ws} to have 0 collections, has {workspace.collection_count}')
+                sleep(3)
+
             rs.Workspace.delete(ws)
         except Exception as e:
-            if e.code == 404 and e.type == 'NotFound':  # Workspace does not exist
-                return None
-            else:  # Unexpected error
+            logger.debug(f'Caught exception of type {e.__class__}')
+            if isinstance(e, rockset.exception.Error) and e.code == 404 and e.type == 'NotFound':  # Workspace does not exist
+                pass
+            else: # Unexpected error
                 raise e
 
     
@@ -364,7 +372,7 @@ class RocksetAdapter(BaseAdapter):
     def _list_views(self, ws):
         endpoint = self._views_endpoint(ws)
         resp_json = json.loads(self._send_rs_request('GET', endpoint).text)
-        return [v.name for v in resp_json['data']]
+        return [v['name'] for v in resp_json['data']]
 
     def _does_view_exist(self, ws, view):
         endpoint = self._views_endpoint(ws) + f'/{view}'
@@ -607,14 +615,16 @@ class RocksetAdapter(BaseAdapter):
             else:
                 break
 
-    def _delete_collection(self, rs, ws, cname):
+    def _delete_collection(self, rs, ws, cname, wait_until_deleted=True):
         try:
             for ref_view in self._get_referencing_views(ws, cname):
                 self._delete_view_recursively(ref_view[0], ref_view[1])
 
             c = rs.Collection.retrieve(cname, workspace=ws)
             c.drop()
-            self._wait_until_collection_deleted(ws, cname)
+            
+            if wait_until_deleted:
+                self._wait_until_collection_deleted(ws, cname)
         except Exception as e:
             if e.code != 404 or e.type != 'NotFound':
                 raise e  # Unexpected error
