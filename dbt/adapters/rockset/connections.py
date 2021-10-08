@@ -41,7 +41,7 @@ class RocksetCredentials(Credentials):
         # `database` is not a required property in Rockset. Dbt still expects to
         # see it in the credentials class in certain places, so put an arbitrary value
         if 'database' not in d:
-            d['database'] = 'doesnt-matter'
+            d['database'] = 'database'
         return d
 
     _ALIASES = {
