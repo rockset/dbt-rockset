@@ -83,7 +83,7 @@ class RocksetAdapter(BaseAdapter):
 
         # Drop all views in the ws
         for view in self._list_views(ws):
-            self._delete_view_recursively(rs, view)
+            self._delete_view_recursively(ws, view)
 
         # Drop all aliases in the ws
         for alias in rs.Alias.list(workspace=ws):
