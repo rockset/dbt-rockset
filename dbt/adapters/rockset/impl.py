@@ -4,12 +4,14 @@ from dbt.adapters.base import (
 from dbt.adapters.sql import SQLAdapter
 from dbt.adapters.rockset.connections import RocksetConnectionManager
 from dbt.adapters.rockset.relation import RocksetRelation
+from dbt.contracts.graph.manifest import Manifest
 from dbt.adapters.rockset.column import RocksetColumn
 from dbt.logger import GLOBAL_LOGGER as logger
 
 import agate
 import dbt
 import json
+import collections
 import os
 import requests
 import rockset
@@ -177,12 +179,50 @@ class RocksetAdapter(BaseAdapter):
         status, table = self.connections.execute(sql, fetch=True)
 
         columns = []
-        for row in table.rows():
-            if length(row['field']) == 1:
+        for row in table.rows:
+            if len(row['field']) == 1:
                 col = self.Column.create(row['field'][0], row['type'])
                 columns.append(col)
 
         return columns
+
+    def _get_types_in_relation(
+        self, relation: RocksetRelation
+    ) -> List[RocksetColumn]:
+        logger.debug(f'Getting columns in relation {relation.identifier}')
+        if not (relation.schema and relation.identifier):
+            return []
+        sql = 'DESCRIBE "{}"."{}"'.format(relation.schema, relation.identifier)
+        status, table = self.connections.execute(sql, fetch=True)
+
+        field_types = collections.defaultdict(list)
+        for row in table.rows:
+            r = json.loads(row['field'])
+            field_path = '.'.join(r)
+            field_types[field_path].append((row['occurrences'], row['type']))
+
+        # Sort types by their relative frequency
+        return [{"column_name": k, "column_type": '/'.join([t[1] for t in sorted(v, reverse=True)])} for k, v in field_types.items()]
+
+    def get_catalog(self, manifest: Manifest) -> agate.Table:
+        schemas = super()._get_cache_schemas(manifest)
+        rs = self._rs_client()
+
+        columns = ['table_database', 'table_name', 'table_schema', 'table_type', 'stats:row_count:label', 'stats:row_count:value', 'stats:row_count:description',
+                   'stats:row_count:include', 'stats:bytes:label', 'stats:bytes:value', 'stats:bytes:description', 'stats:bytes:include', 'column_type', 'column_name', 'column_index']
+        catalog_rows = []
+        for relation in schemas:
+            for collection in rs.Collection.list(workspace=relation.schema):
+                rel = self.Relation.create(
+                    schema=collection.workspace, identifier=collection.name)
+                col_types = self._get_types_in_relation(rel)
+                for i, c in enumerate(col_types):
+                    catalog_rows.append(['', collection.name, collection.workspace, 'NoSQL', 'Row Count', collection.stats['doc_count'], 'Rows in table',
+                                        True, 'Bytes', collection.stats['bytes_inserted'], 'Inserted bytes', True, c['column_type'], c['column_name'], i])
+        catalog_table = agate.Table(rows=catalog_rows, column_names=columns, column_types=agate.TypeTester(
+            force={'table_database': agate.Text(cast_nulls=False, null_values=[])}))
+
+        return catalog_table, []
 
     def expand_column_types(
         self, goal: RocksetRelation, current: RocksetRelation
