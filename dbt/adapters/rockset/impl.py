@@ -248,34 +248,6 @@ class RocksetAdapter(BaseAdapter):
     # Special Rockset implementations
     ###
 
-    def _wait_until_past_commit_fence(self, ws, cname, fence):
-        endpoint = f'/v1/orgs/self/ws/{ws}/collections/{cname}/offsets/commit?fence={fence}'
-        while True:
-            resp = self._send_rs_request('GET', endpoint)
-            resp_json = json.loads(resp.text)
-            passed = resp_json['data']['passed']
-            commit_offset = resp_json['offsets']['commit']
-            if passed:
-                logger.debug(
-                    f'Commit offset {commit_offset} is past given fence {fence}')
-                break
-            else:
-                logger.debug(
-                    f'Waiting for commit offset to pass fence {fence}; it is currently {commit_offset}')
-                sleep(3)
-
-    def _wait_until_iis_fully_ingested(self, ws, cname, query_id):
-        endpoint = f'/v1/orgs/self/queries/{query_id}'
-        while True:
-            query_resp = self._send_rs_request('GET', endpoint)
-            last_offset = json.loads(query_resp.text)['last_offset']
-            if last_offset is not None:
-                return last_offset
-            else:
-                logger.debug(
-                    f'Insert Into Query not yet finished processing; last offset not present')
-                sleep(3)
-
     # Table materialization
     @available.parse(lambda *a, **k: '')
     def create_table(self, relation, sql):
@@ -335,144 +307,9 @@ class RocksetAdapter(BaseAdapter):
         # For now, just sleep 15s to ensure full ingest
         sleep(15)
 
-    def _wait_until_iis_query_processed(self, ws, cname, query_id):
-        last_offset = self._wait_until_iis_fully_ingested(ws, cname, query_id)
-        self._wait_until_past_commit_fence(ws, cname, last_offset)
-
-    def _send_rs_request(self, type, endpoint, body=None, check_success=True):
-        url = self._rs_api_server() + endpoint
-        headers = {"authorization": f'apikey {self._rs_api_key()}'}
-
-        if type == 'GET':
-            resp = requests.get(url, headers=headers)
-        elif type == 'POST':
-            resp = requests.post(url, headers=headers, json=body)
-        elif type == 'DELETE':
-            resp = requests.delete(url, headers=headers)
-        else:
-            raise Exception(f'Unimplemented request type {type}')
-
-        code = resp.status_code
-        if check_success and (code < 200 or code > 299):
-            raise Exception(resp.text)
-        return resp
-
-    def _views_endpoint(self, ws):
-        return f'/v1/orgs/self/ws/{ws}/views'
-
-    def _list_views(self, ws):
-        endpoint = self._views_endpoint(ws)
-        resp_json = json.loads(self._send_rs_request('GET', endpoint).text)
-        return [v['name'] for v in resp_json['data']]
-
-    def _does_view_exist(self, ws, view):
-        endpoint = self._views_endpoint(ws) + f'/{view}'
-        response = self._send_rs_request('GET', endpoint, check_success=False)
-        if response.status_code == NOT_FOUND:
-            return False
-        elif response.status_code == OK:
-            return True
-        else:
-            raise Exception(f'throwing from 332 with status_code {response.status_code} and text {response.text}')
-
-    def _does_alias_exist(self, ws, alias):
-        rs = self._rs_client()
-        try:
-            rs.Alias.retrieve(
-                workspace=ws,
-                name=alias
-            )
-            return True
-        except Exception as e:
-            if isinstance(e, rockset.exception.InputError) and e.code == NOT_FOUND:
-                return False
-            else:
-                raise e
-
-    def _does_collection_exist(self, ws, cname):
-        rs = self._rs_client()
-        try:
-            rs.Collection.retrieve(
-                workspace=ws,
-                name=cname
-            )
-            return True
-        except Exception as e:
-            if isinstance(e, rockset.exception.InputError) and e.code == NOT_FOUND:
-                return False
-            else:
-                raise e
-
-    def _create_view(self, ws, view, sql):
-        # Check if alias or collection exist with same name
-        rs = self._rs_client()
-        if self._does_alias_exist(ws, view):
-            self._delete_alias(rs, ws, view)
-
-        if self._does_collection_exist(ws, view):
-            self._delete_collection(rs, ws, view)
-
-        endpoint = self._views_endpoint(ws)
-        body = {
-            'name': view,
-            'query': sql,
-            'description': 'Created via dbt'
-        }
-        self._send_rs_request('POST', endpoint, body=body)
-
-    # Delete the view and any views that depend on it (recursively)
-    def _delete_view_recursively(self, ws, view):
-        for ref_view in self._get_referencing_views(ws, view):
-            self._delete_view_recursively(ref_view[0], ref_view[1])
-
-        endpoint = f'{self._views_endpoint(ws)}/{view}'
-        del_resp = self._send_rs_request('DELETE', endpoint)
-        if del_resp.status_code == NOT_FOUND:
-            return
-        elif del_resp.status_code != OK:
-            raise Exception(f'throwing from 395 with code {del_resp.status_code} and text {del_resp.text}')
-
-        self._wait_until_view_does_not_exist(ws, view)
-
-    def _get_referencing_views(self, ws, view):
-        view_path = f'{ws}.{view}'
-
-        list_endpoint = f'{self._views_endpoint(ws)}'
-        list_resp = self._send_rs_request('GET', list_endpoint)
-        list_json = json.loads(list_resp.text)
-
-        results = []
-        for view in list_json['data']:
-            for referenced_entity in view['entities']:
-                if referenced_entity == view_path:
-                    results.append((view['workspace'], view['name']))
-        return results
-
-    def _update_view(self, ws, view, sql):
-        endpoint = self._views_endpoint(ws) + f'/{view}'
-        body = {'query': sql}
-        self._send_rs_request('POST', endpoint, body=body)
-
-    def _wait_until_view_fully_synced(self, ws, view):
-        endpoint = f'{self._views_endpoint(ws)}/{view}'
-        while True:
-            resp = self._send_rs_request('GET', endpoint)
-            view_json = json.loads(resp.text)['data']
-            state = view_json['state']
-
-            if state == 'SYNCING':
-                logger.debug(
-                    f'Waiting for view {ws}.{view} to be fully synced')
-                sleep(3)
-            else:
-                logger.debug(
-                    f'View {ws}.{view} is synced and ready to be queried')
-                break
-
     # View materialization
     # As of this comment, the rockset python sdk does not support views, so this is implemented
     # with the python requests library
-
     @available.parse(lambda *a, **k: '')
     def create_view(self, relation, sql):
         ws = relation.schema
@@ -630,3 +467,165 @@ class RocksetAdapter(BaseAdapter):
         except Exception as e:
             if e.code != NOT_FOUND:
                 raise e  # Unexpected error
+
+    def _wait_until_past_commit_fence(self, ws, cname, fence):
+        endpoint = f'/v1/orgs/self/ws/{ws}/collections/{cname}/offsets/commit?fence={fence}'
+        while True:
+            resp = self._send_rs_request('GET', endpoint)
+            resp_json = json.loads(resp.text)
+            passed = resp_json['data']['passed']
+            commit_offset = resp_json['offsets']['commit']
+            if passed:
+                logger.debug(
+                    f'Commit offset {commit_offset} is past given fence {fence}')
+                break
+            else:
+                logger.debug(
+                    f'Waiting for commit offset to pass fence {fence}; it is currently {commit_offset}')
+                sleep(3)
+
+    def _wait_until_iis_fully_ingested(self, ws, cname, query_id):
+        endpoint = f'/v1/orgs/self/queries/{query_id}'
+        while True:
+            query_resp = self._send_rs_request('GET', endpoint)
+            last_offset = json.loads(query_resp.text)['last_offset']
+            if last_offset is not None:
+                return last_offset
+            else:
+                logger.debug(
+                    f'Insert Into Query not yet finished processing; last offset not present')
+                sleep(3)
+
+    def _wait_until_iis_query_processed(self, ws, cname, query_id):
+        last_offset = self._wait_until_iis_fully_ingested(ws, cname, query_id)
+        self._wait_until_past_commit_fence(ws, cname, last_offset)
+
+    def _send_rs_request(self, type, endpoint, body=None, check_success=True):
+        url = self._rs_api_server() + endpoint
+        headers = {"authorization": f'apikey {self._rs_api_key()}'}
+
+        if type == 'GET':
+            resp = requests.get(url, headers=headers)
+        elif type == 'POST':
+            resp = requests.post(url, headers=headers, json=body)
+        elif type == 'DELETE':
+            resp = requests.delete(url, headers=headers)
+        else:
+            raise Exception(f'Unimplemented request type {type}')
+
+        code = resp.status_code
+        if check_success and (code < 200 or code > 299):
+            raise Exception(resp.text)
+        return resp
+
+    def _views_endpoint(self, ws):
+        return f'/v1/orgs/self/ws/{ws}/views'
+
+    def _list_views(self, ws):
+        endpoint = self._views_endpoint(ws)
+        resp_json = json.loads(self._send_rs_request('GET', endpoint).text)
+        return [v['name'] for v in resp_json['data']]
+
+    def _does_view_exist(self, ws, view):
+        endpoint = self._views_endpoint(ws) + f'/{view}'
+        response = self._send_rs_request('GET', endpoint, check_success=False)
+        if response.status_code == NOT_FOUND:
+            return False
+        elif response.status_code == OK:
+            return True
+        else:
+            raise Exception(f'throwing from 332 with status_code {response.status_code} and text {response.text}')
+
+    def _does_alias_exist(self, ws, alias):
+        rs = self._rs_client()
+        try:
+            rs.Alias.retrieve(
+                workspace=ws,
+                name=alias
+            )
+            return True
+        except Exception as e:
+            if isinstance(e, rockset.exception.InputError) and e.code == NOT_FOUND:
+                return False
+            else:
+                raise e
+
+    def _does_collection_exist(self, ws, cname):
+        rs = self._rs_client()
+        try:
+            rs.Collection.retrieve(
+                workspace=ws,
+                name=cname
+            )
+            return True
+        except Exception as e:
+            if isinstance(e, rockset.exception.InputError) and e.code == NOT_FOUND:
+                return False
+            else:
+                raise e
+
+    def _create_view(self, ws, view, sql):
+        # Check if alias or collection exist with same name
+        rs = self._rs_client()
+        if self._does_alias_exist(ws, view):
+            self._delete_alias(rs, ws, view)
+
+        if self._does_collection_exist(ws, view):
+            self._delete_collection(rs, ws, view)
+
+        endpoint = self._views_endpoint(ws)
+        body = {
+            'name': view,
+            'query': sql,
+            'description': 'Created via dbt'
+        }
+        self._send_rs_request('POST', endpoint, body=body)
+
+    # Delete the view and any views that depend on it (recursively)
+    def _delete_view_recursively(self, ws, view):
+        for ref_view in self._get_referencing_views(ws, view):
+            self._delete_view_recursively(ref_view[0], ref_view[1])
+
+        endpoint = f'{self._views_endpoint(ws)}/{view}'
+        del_resp = self._send_rs_request('DELETE', endpoint)
+        if del_resp.status_code == NOT_FOUND:
+            return
+        elif del_resp.status_code != OK:
+            raise Exception(f'throwing from 395 with code {del_resp.status_code} and text {del_resp.text}')
+
+        self._wait_until_view_does_not_exist(ws, view)
+
+    def _get_referencing_views(self, ws, view):
+        view_path = f'{ws}.{view}'
+
+        list_endpoint = f'{self._views_endpoint(ws)}'
+        list_resp = self._send_rs_request('GET', list_endpoint)
+        list_json = json.loads(list_resp.text)
+
+        results = []
+        for view in list_json['data']:
+            for referenced_entity in view['entities']:
+                if referenced_entity == view_path:
+                    results.append((view['workspace'], view['name']))
+        return results
+
+    def _update_view(self, ws, view, sql):
+        endpoint = self._views_endpoint(ws) + f'/{view}'
+        body = {'query': sql}
+        self._send_rs_request('POST', endpoint, body=body)
+
+    def _wait_until_view_fully_synced(self, ws, view):
+        endpoint = f'{self._views_endpoint(ws)}/{view}'
+        while True:
+            resp = self._send_rs_request('GET', endpoint)
+            view_json = json.loads(resp.text)['data']
+            state = view_json['state']
+
+            if state == 'SYNCING':
+                logger.debug(
+                    f'Waiting for view {ws}.{view} to be fully synced')
+                sleep(3)
+            else:
+                logger.debug(
+                    f'View {ws}.{view} is synced and ready to be queried')
+                break
