@@ -7,10 +7,10 @@ sequences:
   test_dbt_data_test: data_test
   test_dbt_schema_test: schema_test
 
-  # These tests are blocked on `database` being included with query SQL. Figure out how to get rid of it;
-  # it is being included with what's in pre_deserialize in connections.py
-
+  # These tests fail because we are not including views in the `dbt docs` catalog. Will be fixed shortly
   # test_dbt_base: base
   # test_dbt_ephemeral: ephemeral
+
+  # This test fails with row count differences of some kind. May be due to the _id field, which is expected
   # test_dbt_incremental: incremental
   
