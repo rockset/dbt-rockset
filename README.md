@@ -19,7 +19,7 @@ rockset:
       type: rockset
       workspace: <rockset_workspace_name>
       api_key: <rockset_api_key>
-      region: <rockset_region> # This is optional. The default is us-west-2
+      api_server: <rockset_api_server> # Default is `api.rs2.usw2.rockset.com`, which is the api_server endpoint for region us-west-2.
   target: dev
 ```
 
