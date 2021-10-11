@@ -91,7 +91,8 @@ class RocksetAdapter(BaseAdapter):
 
         # Drop all collections in the ws
         for collection in rs.Collection.list(workspace=ws):
-            self._delete_collection(rs, ws, collection.name, wait_until_deleted=False)
+            self._delete_collection(
+                rs, ws, collection.name, wait_until_deleted=False)
 
         try:
             # Wait until the ws has 0 collections. We do this so deletion of multiple collections
@@ -107,9 +108,10 @@ class RocksetAdapter(BaseAdapter):
             rs.Workspace.delete(ws)
         except Exception as e:
             logger.debug(f'Caught exception of type {e.__class__}')
-            if isinstance(e, rockset.exception.Error) and e.code == NOT_FOUND:  # Workspace does not exist
+            # Workspace does not exist
+            if isinstance(e, rockset.exception.Error) and e.code == NOT_FOUND:
                 pass
-            else: # Unexpected error
+            else:  # Unexpected error
                 raise e
 
     # Required by BaseAdapter
@@ -449,7 +451,7 @@ class RocksetAdapter(BaseAdapter):
         try:
             c = rs.Collection.retrieve(cname, workspace=ws)
             c.drop()
-            
+
             if wait_until_deleted:
                 self._wait_until_collection_deleted(ws, cname)
         except Exception as e:
@@ -534,7 +536,8 @@ class RocksetAdapter(BaseAdapter):
         elif response.status_code == OK:
             return True
         else:
-            raise Exception(f'throwing from 332 with status_code {response.status_code} and text {response.text}')
+            raise Exception(
+                f'throwing from 332 with status_code {response.status_code} and text {response.text}')
 
     def _does_alias_exist(self, ws, alias):
         rs = self._rs_client()
@@ -591,7 +594,8 @@ class RocksetAdapter(BaseAdapter):
         if del_resp.status_code == NOT_FOUND:
             return
         elif del_resp.status_code != OK:
-            raise Exception(f'throwing from 395 with code {del_resp.status_code} and text {del_resp.text}')
+            raise Exception(
+                f'throwing from 395 with code {del_resp.status_code} and text {del_resp.text}')
 
         self._wait_until_view_does_not_exist(ws, view)
 
