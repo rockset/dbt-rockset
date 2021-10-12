@@ -275,10 +275,8 @@ class RocksetAdapter(BaseAdapter):
         self._wait_until_collection_ready(cname, ws)
 
         # Run an INSERT INTO statement and wait for it to be fully ingested
-        insert_into_sql = f'''
-            INSERT INTO {ws}.{cname}
-            {sql}
-        '''
+        relation = self._rs_collection_to_relation(c)
+        insert_into_sql = f'INSERT INTO {relation} {sql}'
         iis_query_id = self._execute_query(insert_into_sql)
         self._wait_until_iis_query_processed(ws, cname, iis_query_id)
 
@@ -340,10 +338,7 @@ class RocksetAdapter(BaseAdapter):
         cname = relation.identifier
 
         # Run an INSERT INTO statement and wait for it to be fully ingested
-        insert_into_sql = f'''
-            INSERT INTO {ws}.{cname}
-            {sql}
-        '''
+        insert_into_sql = f'INSERT INTO {relation} {sql}'
         iis_query_id = self._execute_query(insert_into_sql)
         self._wait_until_iis_query_processed(ws, cname, iis_query_id)
 
