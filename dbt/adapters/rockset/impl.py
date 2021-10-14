@@ -208,6 +208,7 @@ class RocksetAdapter(BaseAdapter):
         # Sort types by their relative frequency
         return [{"column_name": k, "column_type": '/'.join([t[1] for t in sorted(v, reverse=True)])} for k, v in field_types.items()]
 
+    # Rockset doesn't support DESCRIBE on views, so those are not included in the catalog information
     def get_catalog(self, manifest: Manifest) -> agate.Table:
         schemas = super()._get_cache_schemas(manifest)
         rs = self._rs_client()
@@ -272,7 +273,7 @@ class RocksetAdapter(BaseAdapter):
             cname,
             workspace=ws
         )
-        self._wait_until_collection_ready(cname, ws)
+        self._wait_until_collection_ready(ws, cname)
 
         # Run an INSERT INTO statement and wait for it to be fully ingested
         relation = self._rs_collection_to_relation(c)
@@ -297,7 +298,7 @@ class RocksetAdapter(BaseAdapter):
             table_name,
             workspace=schema
         )
-        self._wait_until_collection_ready(table_name, schema)
+        self._wait_until_collection_ready(schema, table_name)
 
         # Write the results to the collection and wait until the docs are ingested
         expected_doc_count = len(json_docs)
@@ -336,6 +337,7 @@ class RocksetAdapter(BaseAdapter):
 
         ws = relation.schema
         cname = relation.identifier
+        self._wait_until_collection_ready(ws, cname)
 
         # Run an INSERT INTO statement and wait for it to be fully ingested
         insert_into_sql = f'INSERT INTO {relation} {sql}'
@@ -390,7 +392,7 @@ class RocksetAdapter(BaseAdapter):
             else:
                 break
 
-    def _wait_until_collection_ready(self, cname, ws):
+    def _wait_until_collection_ready(self, ws, cname):
         while True:
             c = self._rs_client().Collection.retrieve(
                 cname,

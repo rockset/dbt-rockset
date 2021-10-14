@@ -9,11 +9,13 @@ class RocksetQuotePolicy(Policy):
     schema: bool = True
     identifier: bool = True
 
+
 @dataclass
 class RocksetIncludePolicy(Policy):
     database: bool = False
     schema: bool = True
     identifier: bool = True
+
 
 @dataclass(frozen=True, eq=False, repr=False)
 class RocksetRelation(BaseRelation):
