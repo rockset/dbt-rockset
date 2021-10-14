@@ -301,12 +301,10 @@ class RocksetAdapter(BaseAdapter):
         self._wait_until_collection_ready(schema, table_name)
 
         # Write the results to the collection and wait until the docs are ingested
-        expected_doc_count = len(json_docs)
-        c.add_docs(json_docs)
-
-        # TODO(sam): After code push next, change this to using the write api last_offset
-        # For now, just sleep 15s to ensure full ingest
-        sleep(15)
+        body = {'data': json_docs}
+        write_api_endpoint = f'/v1/orgs/self/ws/{schema}/collections/{table_name}/docs'
+        resp = json.loads(self._send_rs_request('POST', write_api_endpoint, body).text)
+        self._wait_until_past_commit_fence(schema, table_name, resp['last_offset'])
 
     # View materialization
     # As of this comment, the rockset python sdk does not support views, so this is implemented
