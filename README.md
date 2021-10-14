@@ -34,6 +34,14 @@ view | YES | Creates a [Rockset view](https://rockset.com/docs/views/#gatsby-foc
 ephemeral | Yes | Create a CTE.
 incremental | YES | Creates a [Rockset collection](https://docs.rockset.com/collections/) if it doesn't exist, and writes to it.
 
+### Testing Changes
+
+Before landing a commit, ensure that your changes pass tests by inserting an api key for any active Rockset org in `test/rockset.dbtspec`, and then running these two commands to install your changes in your local environment and run our test suite:
+```
+pip3 install .
+pytest test/rockset.dbtspec
+```
+
 ### Formatting
 
 Before landing a commit, format changes according to pep8 using these commands:
