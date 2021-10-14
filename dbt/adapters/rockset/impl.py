@@ -185,8 +185,9 @@ class RocksetAdapter(BaseAdapter):
 
         columns = []
         for row in table.rows:
-            if len(row['field']) == 1:
-                col = self.Column.create(row['field'][0], row['type'])
+            top_lvl_field =  json.loads(row['field'])
+            if len(top_lvl_field) == 1:
+                col = self.Column.create(top_lvl_field[0], row['type'])
                 columns.append(col)
         return columns
 
