@@ -1,6 +1,6 @@
 target:
   type: rockset
-  api_key: 12w1kxxyUvBHY3Qc2AqNOidYhGkL1aqVXTJpPTq3QFZrlaAeOGTEE19OnKCBFdiZ
+  api_key: <enter_api_key_here>
   workspace: "dbt_test_{{ var('_dbt_random_suffix') }}"
 projects:
   - name: base
