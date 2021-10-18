@@ -3,7 +3,7 @@ from dbt.adapters.base import (
 )
 from dbt.adapters.sql import SQLAdapter
 from dbt.adapters.rockset.connections import RocksetConnectionManager
-from dbt.adapters.rockset.relation import RocksetRelation
+from dbt.adapters.rockset.relation import RocksetQuotePolicy, RocksetRelation
 from dbt.contracts.graph.manifest import Manifest
 from dbt.adapters.rockset.column import RocksetColumn
 from dbt.logger import GLOBAL_LOGGER as logger
@@ -16,7 +16,7 @@ import os
 import requests
 import rockset
 from time import sleep, time
-from typing import List
+from typing import List, Optional
 
 
 OK = 200
@@ -158,19 +158,21 @@ class RocksetAdapter(BaseAdapter):
     def list_relations_without_caching(
         self, schema_relation: RocksetRelation
     ) -> List[RocksetRelation]:
+        # Due to the database matching issue, we can not implement relation caching, so
+        # this is a simple pass-through to list_relations
+        return self.list_relations(None, schema_relation.schema)
 
-        # get Rockset client to use Rockset's Python API
+    # We override `list_relations` bc the base implementation uses a caching mechanism that does
+    # not work for our purposes bc it relies on comparing relation.database, and database is not
+    # a concept in Rockset
+    def list_relations(
+        self, database: Optional[str], schema: str
+    ) -> List[RocksetRelation]:
+
         rs = self._rs_client()
-        if schema_relation and schema_relation.identifier and schema_relation.schema:
-            collections = [rs.Collection.retrieve(
-                schema_relation.identifier,
-                workspace=schema_relation.schema,
-            )]
-        else:
-            collections = rs.Collection.list()
-
-        # map Rockset collections to RocksetRelation
         relations = []
+
+        collections = rs.Collection.list(workspace=schema)
         for collection in collections:
             relations.append(self._rs_collection_to_relation(collection))
         return relations
@@ -409,18 +411,12 @@ class RocksetAdapter(BaseAdapter):
         if collection is None:
             return None
 
-        # define quote_policy
-        quote_policy = {
-            'database': False,
-            'schema': True,
-            'identifier': True,
-        }
         return self.Relation.create(
             database=None,
             schema=collection.workspace,
             identifier=collection.name,
             type='table',
-            quote_policy=quote_policy
+            quote_policy=RocksetQuotePolicy()
         )
 
     def _wait_until_alias_deleted(self, ws, alias):
