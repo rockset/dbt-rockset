@@ -87,12 +87,11 @@ class RocksetAdapter(BaseAdapter):
 
         # Drop all aliases in the ws
         for alias in rs.Alias.list(workspace=ws):
-            self._delete_alias(rs, ws, alias.name)
+            self._delete_alias(ws, alias.name)
 
         # Drop all collections in the ws
         for collection in rs.Collection.list(workspace=ws):
-            self._delete_collection(
-                rs, ws, collection.name, wait_until_deleted=False)
+            self._delete_collection(ws, collection.name, wait_until_deleted=False)
 
         try:
             # Wait until the ws has 0 collections. We do this so deletion of multiple collections
@@ -128,9 +127,17 @@ class RocksetAdapter(BaseAdapter):
 
     @available.parse_list
     def drop_relation(self, relation: RocksetRelation) -> None:
-        raise dbt.exceptions.NotImplementedException(
-            '`drop_relation` is not implemented for this adapter!'
-        )
+        ws = relation.schema
+        identifier = relation.identifier
+
+        if self._does_view_exist(ws, identifier):
+            self._delete_view_recursively(ws, identifier)
+        elif self._does_collection_exist(ws, identifier):
+            self._delete_collection(ws, identifier)
+        else:
+            raise dbt.exceptions.Exception(
+                f'Tried to drop relation {ws}.{identifier} that does not exist!'
+            )
 
     def rename_relation(
         self, from_relation: RocksetRelation, to_relation: RocksetRelation
@@ -262,10 +269,10 @@ class RocksetAdapter(BaseAdapter):
         rs = self._rs_client()
 
         if self._does_collection_exist(ws, cname):
-            self._delete_collection(rs, ws, cname)
+            self._delete_collection(ws, cname)
 
         if self._does_alias_exist(ws, cname):
-            self._delete_alias(rs, ws, cname)
+            self._delete_alias(ws, cname)
 
         if self._does_view_exist(ws, cname):
             self._delete_view_recursively(ws, cname)
@@ -287,6 +294,9 @@ class RocksetAdapter(BaseAdapter):
     # Used only for dbt adapter tests
     @available.parse_none
     def load_dataframe(self, database, schema, table_name, agate_table, column_override):
+        ws = schema
+        cname = table_name
+
         # Translate the agate table in json docs
         json_docs = []
         for row in agate_table.rows:
@@ -295,19 +305,24 @@ class RocksetAdapter(BaseAdapter):
                 d[k] = str(v)
             json_docs.append(d)
 
+        # The check for a view should happen before this point
+        if self._does_view_exist(ws, cname):
+            raise dbt.exceptions.Exception(f'InternalError : View {ws}.{cname} exists')
+
         # Create the Rockset collection
-        rs = self._rs_client()
-        c = rs.Collection.create(
-            table_name,
-            workspace=schema
-        )
-        self._wait_until_collection_ready(schema, table_name)
+        if not self._does_collection_exist(ws, cname):
+            rs = self._rs_client()
+            c = rs.Collection.create(
+                cname,
+                workspace=ws
+            )
+        self._wait_until_collection_ready(ws, cname)
 
         # Write the results to the collection and wait until the docs are ingested
         body = {'data': json_docs}
-        write_api_endpoint = f'/v1/orgs/self/ws/{schema}/collections/{table_name}/docs'
+        write_api_endpoint = f'/v1/orgs/self/ws/{ws}/collections/{cname}/docs'
         resp = json.loads(self._send_rs_request('POST', write_api_endpoint, body).text)
-        self._wait_until_past_commit_fence(schema, table_name, resp['last_offset'])
+        self._wait_until_past_commit_fence(ws, cname, resp['last_offset'])
 
     # View materialization
     # As of this comment, the rockset python sdk does not support views, so this is implemented
@@ -365,6 +380,7 @@ class RocksetAdapter(BaseAdapter):
     # if you need the QueryResponse object returned
     # Returns: Query id (str)
     def _execute_query(self, sql):
+        logger.debug(f'Executing sql: {sql}')
         endpoint = '/v1/orgs/self/queries'
         body = {'sql': {'query': sql}}
         resp = self._send_rs_request('POST', endpoint, body=body)
@@ -436,7 +452,9 @@ class RocksetAdapter(BaseAdapter):
             else:
                 break
 
-    def _delete_collection(self, rs, ws, cname, wait_until_deleted=True):
+    def _delete_collection(self, ws, cname, wait_until_deleted=True):
+        rs = self._rs_client()
+
         for ref_view in self._get_referencing_views(ws, cname):
             self._delete_view_recursively(ref_view[0], ref_view[1])
 
@@ -450,7 +468,9 @@ class RocksetAdapter(BaseAdapter):
             if e.code != NOT_FOUND:
                 raise e  # Unexpected error
 
-    def _delete_alias(self, rs, ws, alias):
+    def _delete_alias(self, ws, alias):
+        rs = self._rs_client()
+
         for ref_view in self._get_referencing_views(ws, alias):
             self._delete_view_recursively(ref_view[0], ref_view[1])
 
@@ -563,10 +583,10 @@ class RocksetAdapter(BaseAdapter):
         # Check if alias or collection exist with same name
         rs = self._rs_client()
         if self._does_alias_exist(ws, view):
-            self._delete_alias(rs, ws, view)
+            self._delete_alias(ws, view)
 
         if self._does_collection_exist(ws, view):
-            self._delete_collection(rs, ws, view)
+            self._delete_collection(ws, view)
 
         endpoint = self._views_endpoint(ws)
         body = {

@@ -6,6 +6,7 @@
   {%- set full_refresh_mode = (should_full_refresh()) -%}
 
   {%- set exists_as_view = (old_relation is not none and old_relation.is_view) -%}
+  {%- set exists_as_table = (old_relation is not none and old_relation.is_table) -%}
 
   {%- set agate_table = load_agate_table() -%}
   {%- do store_result('agate_table', response='OK', agate_table=agate_table) -%}
@@ -15,6 +16,8 @@
 
   {% if exists_as_view %}
     {{ exceptions.raise_compiler_error("Cannot seed to '{}', it is a view".format(old_relation)) }}
+  {% elif exists_as_table and full_refresh_mode %}
+    {{ adapter.drop_relation(old_relation) }}
   {% endif %}
   {% set sql = load_csv_rows(model, agate_table) %}
 
@@ -31,10 +34,6 @@
   {{ return({'relations': [target_relation]}) }}
 
 {% endmaterialization %}
-
-{% macro rockset__reset_csv_table(model, full_refresh, old_relation, agate_table) %}
-    {{ adapter.drop_relation(old_relation) }}
-{% endmacro %}
 
 {% macro rockset__load_csv_rows(model, agate_table) %}
   {%- set column_override = model['config'].get('column_types', {}) -%}
