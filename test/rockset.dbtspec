@@ -1,6 +1,6 @@
 target:
   type: rockset
-  api_key: <enter_api_key_here>
+  api_key: 
   workspace: "dbt_test_{{ var('_dbt_random_suffix') }}"
 projects:
   - name: base
@@ -76,75 +76,75 @@ projects:
         rowcount: 10
 
 sequences:
-  # These three standard, built-in tests pass with no problem
-  test_dbt_empty: empty
-  test_dbt_data_test: data_test
-  test_dbt_schema_test: schema_test
+  ## These three standard, built-in tests pass with no problem
+  #test_dbt_empty: empty
+  #test_dbt_data_test: data_test
+  #test_dbt_schema_test: schema_test
 
-  # These next two tests come from the builtin base and ephemeral tests respectively,
-  # but we've put them inline here **without the catalog step**, because our dbt docs
-  # command does not implement all features.
-  base_without_catalog:
-    project: base
-    sequence:
-      - type: dbt
-        cmd: seed
-      - type: run_results
-        length: fact.seed.length
-      - type: dbt
-        cmd: run
-      - type: run_results
-        length: fact.run.length
-      - type: relation_types
-        expect: fact.expected_types_table
-      - type: relation_rows
-        name: base
-        length: fact.base.rowcount
-      - type: relations_equal
-        relations: fact.persisted_relations
-      - type: dbt
-        cmd: docs generate
-      - type: catalog
-        exists: True
-      # now swap
-      - type: dbt
-        cmd: run -m swappable
-        vars:
-          materialized_var: view
-      - type: run_results
-        length: 1
-      - type: relation_types
-        expect: fact.expected_types_view
-      # now incremental
-      - type: dbt
-        cmd: run -m swappable
-        vars:
-          materialized_var: incremental
-      - type: run_results
-        length: 1
-      - type: relation_types
-        expect: fact.expected_types_table
-  ephemeral_without_catalog:
-    project: ephemeral
-    sequence:
-      - type: dbt
-        cmd: seed
-      - type: run_results
-        length: fact.seed.length
-      - type: dbt
-        cmd: run
-      - type: run_results
-        length: fact.run.length
-      - type: relation_rows
-        name: base
-        length: fact.base.rowcount
-      - type: relations_equal
-        relations: fact.persisted_relations
-      - type: dbt
-        cmd: docs generate
-      - type: catalog
-        exists: True
+  ## These next two tests come from the builtin base and ephemeral tests respectively,
+  ## but we've put them inline here **without the catalog step**, because our dbt docs
+  ## command does not implement all features.
+  #base_without_catalog:
+  #  project: base
+  #  sequence:
+  #    - type: dbt
+  #      cmd: seed
+  #    - type: run_results
+  #      length: fact.seed.length
+  #    - type: dbt
+  #      cmd: run
+  #    - type: run_results
+  #      length: fact.run.length
+  #    - type: relation_types
+  #      expect: fact.expected_types_table
+  #    - type: relation_rows
+  #      name: base
+  #      length: fact.base.rowcount
+  #    - type: relations_equal
+  #      relations: fact.persisted_relations
+  #    - type: dbt
+  #      cmd: docs generate
+  #    - type: catalog
+  #      exists: True
+  #    # now swap
+  #    - type: dbt
+  #      cmd: run -m swappable
+  #      vars:
+  #        materialized_var: view
+  #    - type: run_results
+  #      length: 1
+  #    - type: relation_types
+  #      expect: fact.expected_types_view
+  #    # now incremental
+  #    - type: dbt
+  #      cmd: run -m swappable
+  #      vars:
+  #        materialized_var: incremental
+  #    - type: run_results
+  #      length: 1
+  #    - type: relation_types
+  #      expect: fact.expected_types_table
+  #ephemeral_without_catalog:
+  #  project: ephemeral
+  #  sequence:
+  #    - type: dbt
+  #      cmd: seed
+  #    - type: run_results
+  #      length: fact.seed.length
+  #    - type: dbt
+  #      cmd: run
+  #    - type: run_results
+  #      length: fact.run.length
+  #    - type: relation_rows
+  #      name: base
+  #      length: fact.base.rowcount
+  #    - type: relations_equal
+  #      relations: fact.persisted_relations
+  #    - type: dbt
+  #      cmd: docs generate
+  #    - type: catalog
+  #      exists: True
 
-  # This test fails with row count differences of some kind. May be due to the _id field, which is expected
-  # test_dbt_incremental: incremental
+  ## This test fails with row count differences of some kind. May be due to the _id field, which is expected
+  test_dbt_incremental: incremental
   

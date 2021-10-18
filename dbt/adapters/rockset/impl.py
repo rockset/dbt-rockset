@@ -173,6 +173,7 @@ class RocksetAdapter(BaseAdapter):
         relations = []
         for collection in collections:
             relations.append(self._rs_collection_to_relation(collection))
+        print("SJB",schema_relation, relations)
         return relations
 
     # Required by BaseAdapter
@@ -223,10 +224,9 @@ class RocksetAdapter(BaseAdapter):
                     schema=collection.workspace, identifier=collection.name)
                 col_types = self._get_types_in_relation(rel)
                 for i, c in enumerate(col_types):
-                    catalog_rows.append(['', collection.name, collection.workspace, 'NoSQL', 'Row Count', collection.stats['doc_count'], 'Rows in table',
+                    catalog_rows.append([None, collection.name, collection.workspace, 'NoSQL', 'Row Count', collection.stats['doc_count'], 'Rows in table',
                                         True, 'Bytes', collection.stats['bytes_inserted'], 'Inserted bytes', True, c['column_type'], c['column_name'], i])
-        catalog_table = agate.Table(rows=catalog_rows, column_names=columns, column_types=agate.TypeTester(
-            force={'table_database': agate.Text(cast_nulls=False, null_values=[])}))
+        catalog_table = agate.Table(rows=catalog_rows, column_names=columns)
 
         return catalog_table, []
 
@@ -329,6 +329,7 @@ class RocksetAdapter(BaseAdapter):
 
     @available.parse(lambda *a, **k: '')
     def add_incremental_docs(self, relation, sql, unique_key):
+        print("SJB sql", sql)
         if unique_key and unique_key != '_id':
             raise dbt.exceptions.NotImplementedException(
                 '`unique_key` can only be set to `_id` with the Rockset adapter!'

@@ -21,8 +21,10 @@ RS_APISERVERS = [
 
 @dataclass
 class RocksetCredentials(Credentials):
-    api_key: str
-    database: Optional[str]
+    api_key: str = ''
+    workspace: str = ''
+    database: Optional[str] = None
+    schema: str = ''
     api_server: Optional[str] = 'api.rs2.usw2.rockset.com'
 
     @property

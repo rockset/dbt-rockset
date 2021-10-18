@@ -1,6 +1,6 @@
 {% materialization table, adapter='rockset' -%}
   {%- set identifier = model['alias'] -%}
-  {%- set target_relation = api.Relation.create(database=database, schema=schema, identifier=identifier, type='table') -%}
+  {%- set target_relation = api.Relation.create(database=None, schema=schema, identifier=identifier, type='table') -%}
   
   {{ run_hooks(pre_hooks) }}
   {{ adapter.create_table(target_relation, sql) }}
