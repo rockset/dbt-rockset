@@ -40,8 +40,7 @@ class RocksetCredentials(Credentials):
     def __pre_deserialize__(cls, d: Dict[Any, Any]) -> Dict[Any, Any]:
         # `database` is not a required property in Rockset. Dbt still expects to
         # see it in the credentials class in certain places, so put an arbitrary value
-        if 'database' not in d:
-            d['database'] = 'database'
+        d['database'] = None
         return d
 
     _ALIASES = {
