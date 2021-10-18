@@ -54,7 +54,6 @@ class RocksetConnectionManager(BaseConnectionManager):
 
     @classmethod
     def open(cls, connection: Connection) -> Connection:
-        logger.info(f'Opening connection to Rockset')
         if connection.state == 'open':
             logger.debug('Connection is already open, skipping open.')
             return connection
