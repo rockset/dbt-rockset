@@ -22,7 +22,7 @@
   {% set sql = load_csv_rows(model, agate_table) %}
 
   {% call statement('main') -%}
-    {{ "SELECT 1" }}
+    {{ adapter.get_dummy_sql() }}
   {%- endcall %}
 
   {% set target_relation = this.incorporate(type='table') %}

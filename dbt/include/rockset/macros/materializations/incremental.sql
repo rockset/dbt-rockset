@@ -17,7 +17,7 @@
 
   {#-- Rockset does not support CREATE TABLE sql. All logic to create / add docs to collections happens above --#}
   {%- call statement('main') -%}
-    {{ "SELECT 1" }}
+    {{ adapter.get_dummy_sql() }}
   {% endcall %}
 
   {{ run_hooks(post_hooks) }}

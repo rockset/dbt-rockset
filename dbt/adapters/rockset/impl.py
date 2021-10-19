@@ -91,7 +91,8 @@ class RocksetAdapter(BaseAdapter):
 
         # Drop all collections in the ws
         for collection in rs.Collection.list(workspace=ws):
-            self._delete_collection(ws, collection.name, wait_until_deleted=False)
+            self._delete_collection(
+                ws, collection.name, wait_until_deleted=False)
 
         try:
             # Wait until the ws has 0 collections. We do this so deletion of multiple collections
@@ -124,6 +125,15 @@ class RocksetAdapter(BaseAdapter):
         raise dbt.exceptions.NotImplementedException(
             '`truncate` is not implemented for this adapter!'
         )
+
+    @available.parse(lambda *a, **k: '')
+    def get_dummy_sql(self):
+        return f'''
+            /* Rockset does not support `CREATE TABLE AS` statements, so all SQL is executed
+               dynamically in the adapter, instead of as traditionally compiled dbt models. A
+               dummy query is executed instead */
+            SELECT 1;
+        '''
 
     @available.parse_list
     def drop_relation(self, relation: RocksetRelation) -> None:
@@ -194,7 +204,7 @@ class RocksetAdapter(BaseAdapter):
 
         columns = []
         for row in table.rows:
-            top_lvl_field =  json.loads(row['field'])
+            top_lvl_field = json.loads(row['field'])
             if len(top_lvl_field) == 1:
                 col = self.Column.create(top_lvl_field[0], row['type'])
                 columns.append(col)
@@ -307,7 +317,8 @@ class RocksetAdapter(BaseAdapter):
 
         # The check for a view should happen before this point
         if self._does_view_exist(ws, cname):
-            raise dbt.exceptions.Exception(f'InternalError : View {ws}.{cname} exists')
+            raise dbt.exceptions.Exception(
+                f'InternalError : View {ws}.{cname} exists')
 
         # Create the Rockset collection
         if not self._does_collection_exist(ws, cname):
@@ -321,7 +332,8 @@ class RocksetAdapter(BaseAdapter):
         # Write the results to the collection and wait until the docs are ingested
         body = {'data': json_docs}
         write_api_endpoint = f'/v1/orgs/self/ws/{ws}/collections/{cname}/docs'
-        resp = json.loads(self._send_rs_request('POST', write_api_endpoint, body).text)
+        resp = json.loads(self._send_rs_request(
+            'POST', write_api_endpoint, body).text)
         self._wait_until_past_commit_fence(ws, cname, resp['last_offset'])
 
     # View materialization
