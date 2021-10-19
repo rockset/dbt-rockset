@@ -10,9 +10,6 @@ projects:
       models/table_model.sql: files.models.base_table
       models/swappable.sql: files.models.base_materialized_var
       models/schema.yml: files.schemas.base
-    dbt_project_yml:
-      models:
-        dbt_test_project:
     facts:
       seed:
         length: 1
@@ -78,6 +75,19 @@ projects:
         - table_model
       base:
         rowcount: 10
+
+  # The crazy id match is used to make sure that 0 rows are selected
+  - name: zero-rows
+    paths:
+      data/base.csv: files.seeds.base
+      models/incremental.sql:
+        materialized: incremental
+        body: "select * from dbt_test_{{ var('_dbt_random_suffix') }}.base WHERE id = 99999999999999999;"
+    facts:
+      base:
+        rowcount: 10
+      incremental:
+        rowcount: 0
 
 sequences:
   # These three standard, built-in tests pass with no problem
@@ -177,3 +187,19 @@ sequences:
       - type: relation_rows
         name: base
         length: fact.base.rowcount
+
+  # Test the case where a query inserts 0 rows into the collection. This was a bug previously, where we would fail on
+  # queries that returned 0 rows
+  zero-rows:
+    project: zero-rows
+    sequence:
+      - type: dbt
+        cmd: seed
+      - type: relation_rows
+        name: base
+        length: fact.base.rowcount
+      - type: dbt
+        cmd: run
+      - type: relation_rows
+        name: incremental
+        length: fact.incremental.rowcount
