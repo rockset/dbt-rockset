@@ -406,7 +406,6 @@ class RocksetAdapter(BaseAdapter):
             raise dbt.exceptions.Exception(resp.text)
 
         json_resp = json.loads(resp.text)
-        print(f'json_resp: {json_resp}')
         assert len(json_resp['results']) == 1
 
         return json_resp['query_id'], json_resp['results'][0]['num_docs_inserted']
