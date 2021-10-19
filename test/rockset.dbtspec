@@ -36,6 +36,10 @@ projects:
         - swappable
       base:
         rowcount: 10
+      base-after-second-seed:
+        rowcount: 20
+      base-after-third-seed:
+        rowcount: 30
       expected_types_view:
         base: table
         view_model: view
@@ -147,4 +151,29 @@ sequences:
 
   # This test fails with row count differences of some kind. May be due to the _id field, which is expected
   # test_dbt_incremental: incremental
-  
+
+  # This test seeds a collection, then seeds it two more times and ensures that docs are incrementally added
+  # each time. Then, it seeds in full refresh mode and ensures that docs are back to 10
+  seed:
+    project: base
+    sequence:
+      - type: dbt
+        cmd: seed
+      - type: relation_rows
+        name: base
+        length: fact.base.rowcount
+      - type: dbt
+        cmd: seed
+      - type: relation_rows
+        name: base
+        length: fact.base-after-second-seed.rowcount
+      - type: dbt
+        cmd: seed
+      - type: relation_rows
+        name: base
+        length: fact.base-after-third-seed.rowcount
+      - type: dbt
+        cmd: seed --full-refresh
+      - type: relation_rows
+        name: base
+        length: fact.base.rowcount
