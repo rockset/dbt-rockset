@@ -297,9 +297,7 @@ class RocksetAdapter(BaseAdapter):
 
         # Run an INSERT INTO statement and wait for it to be fully ingested
         relation = self._rs_collection_to_relation(c)
-        insert_into_sql = f'INSERT INTO {relation} {sql}'
-        iis_query_id = self._execute_query(insert_into_sql)
-        self._wait_until_iis_query_processed(ws, cname, iis_query_id)
+        iis_query_id = self._execute_iis_query_and_wait_for_docs(relation, sql)
 
     # Used only for dbt adapter tests
     @available.parse_none
@@ -368,9 +366,7 @@ class RocksetAdapter(BaseAdapter):
         self._wait_until_collection_ready(ws, cname)
 
         # Run an INSERT INTO statement and wait for it to be fully ingested
-        insert_into_sql = f'INSERT INTO {relation} {sql}'
-        iis_query_id = self._execute_query(insert_into_sql)
-        self._wait_until_iis_query_processed(ws, cname, iis_query_id)
+        iis_query_id = self._execute_iis_query_and_wait_for_docs(relation, sql)
 
     ###
     # Internal Rockset helper methods
@@ -388,18 +384,30 @@ class RocksetAdapter(BaseAdapter):
     def _rs_cursor(self):
         return self.connections.get_thread_connection().handle.cursor()
 
-    # Execute a query not using the SQL cursor, but by hitting the REST api. This can be done
+    def _execute_iis_query_and_wait_for_docs(self, relation, sql):
+        query_id, num_docs_inserted = self._execute_iis_query(relation, sql)
+        if num_docs_inserted > 0:
+            self._wait_until_iis_query_processed(relation.schema, relation.identifier, query_id)
+        else:
+            logger.info(f'Query {query_id} inserted 0 docs; no ingest to wait for.')
+
+    # Execute a query not using the SQL cursor, but by hitting the REST api. This should be done
     # if you need the QueryResponse object returned
-    # Returns: Query id (str)
-    def _execute_query(self, sql):
-        logger.debug(f'Executing sql: {sql}')
+    # Returns: query_id (str), num_docs_inserted (int)
+    def _execute_iis_query(self, relation, sql):
+        iis_sql = f'INSERT INTO {relation} {sql}'
+        logger.debug(f'Executing sql: {iis_sql}')
         endpoint = '/v1/orgs/self/queries'
-        body = {'sql': {'query': sql}}
+        body = {'sql': {'query': iis_sql}}
         resp = self._send_rs_request('POST', endpoint, body=body)
         if resp.status_code != OK:
             raise dbt.exceptions.Exception(resp.text)
 
-        return json.loads(resp.text)['query_id']
+        json_resp = json.loads(resp.text)
+        print(f'json_resp: {json_resp}')
+        assert len(json_resp['results']) == 1
+
+        return json_resp['query_id'], json_resp['results'][0]['num_docs_inserted']
 
     def _wait_until_collection_does_not_exist(self, cname, ws):
         while True:
