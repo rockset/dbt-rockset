@@ -708,10 +708,10 @@ class RocksetAdapter(BaseAdapter):
             else:
                 logger.debug(
                     f'View {ws}.{view} is synced and ready to be queried')
-                break
+                return
 
         raise dbt.exceptions.Exception(
-            f'Waited more than {max_wait_time_secs} secs for view {ws}.{cname} to become synced. Something is wrong.'
+            f'Waited more than {max_wait_time_secs} secs for view {ws}.{view} to become synced. Something is wrong.'
         )
 
     # Overridden because Rockset generates columns not added during testing.
