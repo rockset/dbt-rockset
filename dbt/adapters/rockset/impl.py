@@ -9,12 +9,14 @@ from dbt.adapters.rockset.column import RocksetColumn
 from dbt.logger import GLOBAL_LOGGER as logger
 
 import agate
+import datetime
 import dbt
 import json
 import collections
 import os
 import requests
 import rockset
+from decimal import Decimal
 from time import sleep, time
 from typing import List, Optional, Set
 
@@ -299,7 +301,7 @@ class RocksetAdapter(BaseAdapter):
         relation = self._rs_collection_to_relation(c)
         iis_query_id = self._execute_iis_query_and_wait_for_docs(relation, sql)
 
-    # Used only for dbt adapter tests
+    # Used by dbt seed
     @available.parse_none
     def load_dataframe(self, database, schema, table_name, agate_table, column_override):
         ws = schema
@@ -310,7 +312,7 @@ class RocksetAdapter(BaseAdapter):
         for row in agate_table.rows:
             d = dict(row.dict())
             for k, v in d.items():
-                d[k] = str(v)
+                d[k] = self._convert_agate_data_type(v)
             json_docs.append(d)
 
         # The check for a view should happen before this point
@@ -321,7 +323,7 @@ class RocksetAdapter(BaseAdapter):
         # Create the Rockset collection
         if not self._does_collection_exist(ws, cname):
             rs = self._rs_client()
-            c = rs.Collection.create(
+            rs.Collection.create(
                 cname,
                 workspace=ws
             )
@@ -333,6 +335,19 @@ class RocksetAdapter(BaseAdapter):
         resp = json.loads(self._send_rs_request(
             'POST', write_api_endpoint, body).text)
         self._wait_until_past_commit_fence(ws, cname, resp['last_offset'])
+
+    def _convert_agate_data_type(self, v):
+        if isinstance(v, str):
+            return v
+        elif isinstance(v, Decimal):
+            return float(v)
+        elif isinstance(v, datetime.datetime):
+            return str(v)
+        elif isinstance(v, datetime.date):
+            return str(v)
+        else:
+            raise dbt.exceptions.Exception(
+                f'Unknown data type {v.__class__} in seeded table')
 
     # View materialization
     # As of this comment, the rockset python sdk does not support views, so this is implemented
@@ -431,7 +446,18 @@ class RocksetAdapter(BaseAdapter):
                 break
 
     def _wait_until_collection_ready(self, ws, cname):
-        while True:
+        max_wait_time_secs = 600
+        sleep_secs = 3
+        total_sleep_time = 0
+
+        while total_sleep_time < max_wait_time_secs:
+            if not self._does_collection_exist(ws, cname):
+                logger.debug(
+                    f'Collection {ws}.{cname} does not exist. This is likely a transient consistency error.')
+                sleep(sleep_secs)
+                total_sleep_time += sleep_secs
+                continue
+
             c = self._rs_client().Collection.retrieve(
                 cname,
                 workspace=ws
@@ -442,7 +468,12 @@ class RocksetAdapter(BaseAdapter):
             else:
                 logger.debug(
                     f'Waiting for collection {ws}.{cname} to become ready...')
-                sleep(3)
+                sleep(sleep_secs)
+                total_sleep_time += sleep_secs
+
+        raise dbt.exceptions.Exception(
+            f'Waited more than {max_wait_time_secs} secs for {ws}.{cname} to become ready. Something is wrong.'
+        )
 
     def _rs_collection_to_relation(self, collection):
         if collection is None:
@@ -652,8 +683,19 @@ class RocksetAdapter(BaseAdapter):
         self._send_rs_request('POST', endpoint, body=body)
 
     def _wait_until_view_fully_synced(self, ws, view):
+        max_wait_time_secs = 600
+        sleep_secs = 3
+        total_sleep_time = 0
+
         endpoint = f'{self._views_endpoint(ws)}/{view}'
-        while True:
+        while total_sleep_time < max_wait_time_secs:
+            if not self._does_view_exist(ws, view):
+                logger.debug(
+                    f'View {ws}.{cname} does not exist. This is likely a transient consistency error.')
+                sleep(sleep_secs)
+                total_sleep_time += sleep_secs
+                continue
+
             resp = self._send_rs_request('GET', endpoint)
             view_json = json.loads(resp.text)['data']
             state = view_json['state']
@@ -661,11 +703,16 @@ class RocksetAdapter(BaseAdapter):
             if state == 'SYNCING':
                 logger.debug(
                     f'Waiting for view {ws}.{view} to be fully synced')
-                sleep(3)
+                sleep(sleep_secs)
+                total_sleep_time += sleep_secs
             else:
                 logger.debug(
                     f'View {ws}.{view} is synced and ready to be queried')
                 break
+
+        raise dbt.exceptions.Exception(
+            f'Waited more than {max_wait_time_secs} secs for view {ws}.{cname} to become synced. Something is wrong.'
+        )
 
     # Overridden because Rockset generates columns not added during testing.
     def get_rows_different_sql(
