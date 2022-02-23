@@ -36,6 +36,11 @@ incremental | YES | Creates a [Rockset collection](https://docs.rockset.com/coll
 
 ### Testing Changes
 
+Install [dbt-adapter-tests](https://github.com/dbt-labs/dbt-adapter-tests) in order to run the tests:
+```
+pip3 install pytest-dbt-adapter
+```
+
 Before landing a commit, ensure that your changes pass tests by inserting an api key for any active Rockset org in `test/rockset.dbtspec`, and then running these two commands to install your changes in your local environment and run our test suite:
 ```
 pip3 install .
