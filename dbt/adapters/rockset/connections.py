@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 
 RS_APISERVERS = [
+    'api.euc1a1.rockset.com',
     'api.rs2.usw2.rockset.com',
     'api.use1a1.rockset.com'
 ]
