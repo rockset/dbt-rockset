@@ -554,7 +554,8 @@ class RocksetAdapter(BaseAdapter):
         endpoint = f'/v1/orgs/self/queries/{query_id}'
         while True:
             query_resp = self._send_rs_request('GET', endpoint)
-            last_offset = json.loads(query_resp.text)['data']['last_offset']
+            last_offset = json.loads(query_resp.text)['data']['last_offset'] if 'data' in json.loads(
+                query_resp.text) else json.loads(query_resp.text)['last_offset']
             if last_offset is not None:
                 return last_offset
             else:
