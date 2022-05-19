@@ -1,8 +1,6 @@
 # dbt-rockset
 [dbt](https://www.getdbt.com/) adapter for [Rockset](https://rockset.com/)
 
-Note: this plugin is still under development, and is not yet suitable for production environments
-
 ## Installation
 This plugin can be installed with:
 ```
