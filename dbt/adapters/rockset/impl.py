@@ -393,6 +393,9 @@ class RocksetAdapter(BaseAdapter):
     def _rs_api_key(self):
         return self.connections.get_thread_connection().credentials.api_key
 
+    def _rs_vi_rrn(self):
+        return self.connections.get_thread_connection().credentials.vi_rrn
+
     def _rs_api_server(self):
         return f'https://{self.connections.get_thread_connection().credentials.api_server}'
 
@@ -414,7 +417,12 @@ class RocksetAdapter(BaseAdapter):
     def _execute_iis_query(self, relation, sql):
         iis_sql = f'INSERT INTO {relation} {sql}'
         logger.debug(f'Executing sql: {iis_sql}')
-        endpoint = '/v1/orgs/self/queries'
+
+        if self._rs_vi_rrn():
+            endpoint = f"/v1/orgs/self/virtualinstances/{self._rs_vi_rrn()}/queries"
+        else:
+            endpoint = '/v1/orgs/self/queries'
+
         body = {'sql': {'query': iis_sql}}
         resp = self._send_rs_request('POST', endpoint, body=body)
         if resp.status_code != OK:
