@@ -16,7 +16,8 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 RS_APISERVERS = [
     'api.euc1a1.rockset.com',
     'api.rs2.usw2.rockset.com',
-    'api.use1a1.rockset.com'
+    'api.usw2a1.rockset.com',
+    'api.use1a1.rockset.com',
 ]
 
 
@@ -24,7 +25,8 @@ RS_APISERVERS = [
 class RocksetCredentials(Credentials):
     api_key: str
     database: Optional[str]
-    api_server: Optional[str] = 'api.rs2.usw2.rockset.com'
+    api_server: Optional[str] = 'api.usw2a1.rockset.com'
+    vi_rrn: Optional[str] = None
 
     @property
     def type(self):
