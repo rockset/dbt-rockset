@@ -17,7 +17,9 @@ rockset:
       type: rockset
       workspace: <rockset_workspace_name>
       api_key: <rockset_api_key>
-      api_server: <rockset_api_server> # Default is `api.rs2.usw2.rockset.com`, which is the api_server endpoint for region us-west-2.
+      api_server: <rockset_api_server> # Optional, default is `api.rs2.usw2.rockset.com`, which is the api_server endpoint for region us-west-2.
+      vi_rrn: <rockset_virtual_instance_rrn> # Optional, specify which VI to use for IIS queries
+      run_async_iis: <async_iis_queries> # Optional, default is false, use async execution for IIS queries for a longer query timeout
   target: dev
 ```
 

@@ -27,6 +27,7 @@ class RocksetCredentials(Credentials):
     database: Optional[str]
     api_server: Optional[str] = 'api.usw2a1.rockset.com'
     vi_rrn: Optional[str] = None
+    run_async_iis: Optional[bool] = False
 
     @property
     def type(self):
