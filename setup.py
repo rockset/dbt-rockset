@@ -3,7 +3,7 @@ from setuptools import find_packages
 from distutils.core import setup
 
 package_name = "dbt-rockset"
-package_version = "0.1.5"
+package_version = "0.1.6"
 description = """The Rockset adapter plugin for dbt (data build tool)"""
 
 setup(
