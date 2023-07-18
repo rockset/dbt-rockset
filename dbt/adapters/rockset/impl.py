@@ -368,7 +368,9 @@ class RocksetAdapter(BaseAdapter):
         self._wait_until_past_commit_fence(ws, cname, resp["last_offset"])
 
     def _convert_agate_data_type(self, v):
-        if isinstance(v, str):
+        if v is None:
+            return None
+        elif isinstance(v, str):
             return v
         elif isinstance(v, Decimal):
             return float(v)
