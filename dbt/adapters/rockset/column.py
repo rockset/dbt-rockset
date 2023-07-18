@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from dbt.adapters.base.column import Column
-from dbt.exceptions import RuntimeException
+from dbt.exceptions import DbtRuntimeError
 
 import rockset
 
@@ -22,6 +22,6 @@ class RocksetColumn(Column):
 
     def string_size(self) -> int:
         if not self.is_string():
-            raise RuntimeException("Called string_size() on non-string field!")
+            raise DbtRuntimeError("Called string_size() on non-string field!")
 
         return rockset.Client.MAX_FIELD_VALUE_BYTES

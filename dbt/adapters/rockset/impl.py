@@ -117,7 +117,7 @@ class RocksetAdapter(BaseAdapter):
     @available
     def list_schemas(self, database: str) -> List[str]:
         rs = self._rs_client()
-        return [ws.name for ws in rs.Workspace.list()]
+        return [ws.name for ws in rs.Workspaces.list().data]
 
     # Relation/Collection related methods
     def truncate_relation(self, relation: RocksetRelation) -> None:
@@ -188,7 +188,7 @@ class RocksetAdapter(BaseAdapter):
         rs = self._rs_client()
         relations = []
 
-        collections = rs.Collection.list(workspace=schema)
+        collections = rs.Collections.workspace_collections(workspace=schema).data
         for collection in collections:
             relations.append(self._rs_collection_to_relation(collection))
         return relations
@@ -420,7 +420,7 @@ class RocksetAdapter(BaseAdapter):
     ###
 
     def _rs_client(self):
-        return self.connections.get_thread_connection().handle._client()
+        return self.connections.get_thread_connection().handle._client
 
     def _rs_api_key(self):
         return self.connections.get_thread_connection().credentials.api_key
