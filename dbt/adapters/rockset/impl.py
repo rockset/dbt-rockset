@@ -73,7 +73,7 @@ class RocksetAdapter(BaseAdapter):
     def create_schema(self, relation: RocksetRelation) -> None:
         rs = self._rs_client()
         logger.debug('Creating workspace "{}"', relation.schema)
-        rs.Workspace.create(relation.schema)
+        rs.Workspaces.create(name=relation.schema)
 
     def drop_schema(self, relation: RocksetRelation) -> None:
         rs = self._rs_client()
@@ -89,14 +89,14 @@ class RocksetAdapter(BaseAdapter):
             self._delete_alias(ws, alias.name)
 
         # Drop all collections in the ws
-        for collection in rs.Collection.list(workspace=ws):
+        for collection in rs.Collections.workspace_collections(workspace=ws).data:
             self._delete_collection(ws, collection.name, wait_until_deleted=False)
 
         try:
             # Wait until the ws has 0 collections. We do this so deletion of multiple collections
             # can happen in parallel
             while True:
-                workspace = rs.Workspace.retrieve(ws)
+                workspace = rs.Workspaces.get(ws).data
                 if workspace.collection_count == 0:
                     break
                 logger.debug(
@@ -104,11 +104,11 @@ class RocksetAdapter(BaseAdapter):
                 )
                 sleep(3)
 
-            rs.Workspace.delete(ws)
+            rs.Workspaces.delete(workspace=ws)
         except Exception as e:
             logger.debug(f"Caught exception of type {e.__class__}")
             # Workspace does not exist
-            if isinstance(e, rockset.exception.Error) and e.code == NOT_FOUND:
+            if isinstance(e, rockset.exceptions.ApiException) and e.status == NOT_FOUND:
                 pass
             else:  # Unexpected error
                 raise e
@@ -162,10 +162,10 @@ class RocksetAdapter(BaseAdapter):
 
         try:
             rs = self._rs_client()
-            existing_collection = rs.Collection.retrieve(cname, workspace=ws)
+            existing_collection = rs.Collections.get(collection=cname, workspace=ws)
             return self._rs_collection_to_relation(existing_collection)
         except Exception as e:
-            if e.code == NOT_FOUND:  # Collection does not exist
+            if hasattr(e, "status") and e.status == NOT_FOUND:  # Collection does not exist
                 return None
             else:  # Unexpected error
                 raise e
@@ -253,7 +253,7 @@ class RocksetAdapter(BaseAdapter):
         ]
         catalog_rows = []
         for relation in schemas:
-            for collection in rs.Collection.list(workspace=relation.schema):
+            for collection in rs.Collections.workspace_collections(workspace=relation.schema).data:
                 rel = self.Relation.create(
                     schema=collection.workspace, identifier=collection.name
                 )
@@ -328,7 +328,7 @@ class RocksetAdapter(BaseAdapter):
 
         logger.debug(f"Creating collection {ws}.{cname}")
 
-        c = rs.Collection.create(cname, workspace=ws)
+        c = rs.Collections.create_s3_collection(name=cname, workspace=ws)
         self._wait_until_collection_ready(ws, cname)
 
         # Run an INSERT INTO statement and wait for it to be fully ingested
@@ -358,7 +358,7 @@ class RocksetAdapter(BaseAdapter):
         # Create the Rockset collection
         if not self._does_collection_exist(ws, cname):
             rs = self._rs_client()
-            rs.Collection.create(cname, workspace=ws)
+            rs.Collections.create_s3_collection(name=cname, workspace=ws)
         self._wait_until_collection_ready(ws, cname)
 
         # Write the results to the collection and wait until the docs are ingested
@@ -493,7 +493,7 @@ class RocksetAdapter(BaseAdapter):
                 logger.debug(f"Waiting for collection {ws}.{cname} to be deleted...")
                 sleep(3)
             except Exception as e:
-                if e.code == NOT_FOUND:  # Collection does not exist
+                if hasattr(e, "status") and e.status == NOT_FOUND:  # Collection does not exist
                     return
                 raise e
 
@@ -567,13 +567,13 @@ class RocksetAdapter(BaseAdapter):
             self._delete_view_recursively(ref_view[0], ref_view[1])
 
         try:
-            c = rs.Collection.retrieve(cname, workspace=ws)
+            c = rs.Collections.get(collection=cname, workspace=ws)
             c.drop()
 
             if wait_until_deleted:
-                self._wait_until_collection_deleted(ws, cname)
+                self._wait_until_collection_deleted(workspace=ws, collection=cname)
         except Exception as e:
-            if e.code != NOT_FOUND:
+            if hasattr(e, "status") and e.status != NOT_FOUND: 
                 raise e  # Unexpected error
 
     def _delete_alias(self, ws, alias):
@@ -583,11 +583,11 @@ class RocksetAdapter(BaseAdapter):
             self._delete_view_recursively(ref_view[0], ref_view[1])
 
         try:
-            a = rs.Alias.retrieve(alias, workspace=ws)
+            a = rs.Aliases.get(alias=alias, workspace=ws)
             a.drop()
             self._wait_until_alias_deleted(ws, alias)
         except Exception as e:
-            if e.code != NOT_FOUND:
+            if hasattr(e, "status") and e.status != NOT_FOUND:
                 raise e  # Unexpected error
 
     def _wait_until_past_commit_fence(self, ws, cname, fence):
@@ -687,10 +687,10 @@ class RocksetAdapter(BaseAdapter):
     def _does_alias_exist(self, ws, alias):
         rs = self._rs_client()
         try:
-            rs.Alias.retrieve(workspace=ws, name=alias)
+            rs.Aliases.get(alias=alias, workspace=ws)
             return True
         except Exception as e:
-            if isinstance(e, rockset.exception.InputError) and e.code == NOT_FOUND:
+            if e.status == NOT_FOUND:
                 return False
             else:
                 raise e
@@ -698,10 +698,10 @@ class RocksetAdapter(BaseAdapter):
     def _does_collection_exist(self, ws, cname):
         rs = self._rs_client()
         try:
-            rs.Collection.retrieve(workspace=ws, name=cname)
+            rs.Collections.get(workspace=ws, collection=cname)
             return True
         except Exception as e:
-            if isinstance(e, rockset.exception.InputError) and e.code == NOT_FOUND:
+            if e.status == NOT_FOUND:
                 return False
             else:
                 raise e
@@ -763,7 +763,7 @@ class RocksetAdapter(BaseAdapter):
         while total_sleep_time < max_wait_time_secs:
             if not self._does_view_exist(ws, view):
                 logger.debug(
-                    f"View {ws}.{cname} does not exist. This is likely a transient consistency error."
+                    f"View {ws}.{view} does not exist. This is likely a transient consistency error."
                 )
                 sleep(sleep_secs)
                 total_sleep_time += sleep_secs
