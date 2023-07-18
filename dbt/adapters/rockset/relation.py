@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from dbt.adapters.base.relation import BaseRelation, Policy
 
 import traceback
@@ -18,11 +18,10 @@ class RocksetIncludePolicy(Policy):
     schema: bool = True
     identifier: bool = True
 
-
 @dataclass(frozen=True, eq=False, repr=False)
 class RocksetRelation(BaseRelation):
-    quote_policy: RocksetQuotePolicy = RocksetQuotePolicy()
-    include_policy: RocksetIncludePolicy = RocksetIncludePolicy()
+    quote_policy = field(default_factory=lambda: RocksetQuotePolicy())
+    include_policy = field(default_factory=lambda: RocksetIncludePolicy())
 
     # We override this function with a very simple implementation. Database is not a concept
     # in Rockset, so we do not make such a comparison
