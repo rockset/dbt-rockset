@@ -24,7 +24,6 @@ setup(
     },
     install_requires=[
         "dbt-core==1.5.0",
-        "rockset>=2.0, <3.0",
         "rockst-sqlalchemy>=0.0.1"
     ]
 )
