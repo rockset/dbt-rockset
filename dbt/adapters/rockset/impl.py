@@ -97,7 +97,7 @@ class RocksetAdapter(BaseAdapter):
             # Wait until the ws has 0 collections. We do this so deletion of multiple collections
             # can happen in parallel
             while True:
-                workspace = rs.Workspaces.get(ws).data
+                workspace = rs.Workspaces.get(workspace=ws).data
                 if workspace.collection_count == 0:
                     break
                 logger.debug(
@@ -582,12 +582,11 @@ class RocksetAdapter(BaseAdapter):
             self._delete_view_recursively(ref_view[0], ref_view[1])
 
         try:
-            c = rs.Collections.get(collection=cname, workspace=ws)
-            c.drop()
+            c = rs.Collections.delete(collection=cname, workspace=ws)
 
             if wait_until_deleted:
                 self._wait_until_collection_deleted(
-                    workspace=ws, collection=cname)
+                    ws, cname)
         except Exception as e:
             if hasattr(e, "status") and e.status != NOT_FOUND:
                 raise e  # Unexpected error
@@ -599,8 +598,7 @@ class RocksetAdapter(BaseAdapter):
             self._delete_view_recursively(ref_view[0], ref_view[1])
 
         try:
-            a = rs.Aliases.get(alias=alias, workspace=ws)
-            a.drop()
+            rs.Aliases.delete(alias=alias, workspace=ws)
             self._wait_until_alias_deleted(ws, alias)
         except Exception as e:
             if hasattr(e, "status") and e.status != NOT_FOUND:
