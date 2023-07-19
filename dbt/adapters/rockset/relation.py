@@ -18,10 +18,13 @@ class RocksetIncludePolicy(Policy):
     schema: bool = True
     identifier: bool = True
 
+
 @dataclass(frozen=True, eq=False, repr=False)
 class RocksetRelation(BaseRelation):
-    quote_policy: RocksetQuotePolicy = field(default_factory=lambda: RocksetQuotePolicy())
-    include_policy: RocksetIncludePolicy = field(default_factory=lambda: RocksetIncludePolicy())
+    quote_policy: RocksetQuotePolicy = field(
+        default_factory=lambda: RocksetQuotePolicy())
+    include_policy: RocksetIncludePolicy = field(
+        default_factory=lambda: RocksetIncludePolicy())
 
     # We override this function with a very simple implementation. Database is not a concept
     # in Rockset, so we do not make such a comparison
