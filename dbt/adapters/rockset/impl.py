@@ -489,7 +489,7 @@ class RocksetAdapter(BaseAdapter):
     def _wait_until_collection_does_not_exist(self, cname, ws):
         while True:
             try:
-                c = self._rs_client().Collection.retrieve(cname, workspace=ws)
+                self._rs_client().Collections.get(collection=cname, workspace=ws)
                 logger.debug(f"Waiting for collection {ws}.{cname} to be deleted...")
                 sleep(3)
             except Exception as e:
@@ -519,8 +519,8 @@ class RocksetAdapter(BaseAdapter):
                 total_sleep_time += sleep_secs
                 continue
 
-            c = self._rs_client().Collection.retrieve(cname, workspace=ws)
-            if c.describe().data["status"] == "READY":
+            c = self._rs_client().Collections.get(collection=cname, workspace=ws)
+            if c.data["status"] == "READY":
                 logger.debug(f"{ws}.{cname} is ready!")
                 return
             else:
@@ -533,8 +533,12 @@ class RocksetAdapter(BaseAdapter):
         )
 
     def _rs_collection_to_relation(self, collection):
+        
         if collection is None:
             return None
+        
+        if hasattr(collection, "data"):
+            collection = collection.data  # TODO: remove the need for this
 
         return self.Relation.create(
             database=None,
