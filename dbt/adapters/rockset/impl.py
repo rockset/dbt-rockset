@@ -85,7 +85,7 @@ class RocksetAdapter(BaseAdapter):
             self._delete_view_recursively(ws, view)
 
         # Drop all aliases in the ws
-        for alias in rs.Alias.list(workspace=ws):
+        for alias in rs.Aliases.workspace_aliases(workspace=ws):
             self._delete_alias(ws, alias.name)
 
         # Drop all collections in the ws
