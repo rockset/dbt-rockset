@@ -8,8 +8,7 @@ from dbt.logger import GLOBAL_LOGGER as logger
 
 import agate
 import dbt
-import rockset
-from rockset import Client, Q, F, sql
+import rockset_sqlalchemy as sql
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 
