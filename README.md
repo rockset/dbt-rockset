@@ -8,6 +8,7 @@ The following subsections describe the adapter's installation procedure and supp
 * [Supported Materializations](#supported-materializations)
 * [Real-Time Streaming ELT Using dbt + Rockset](#real-time-streaming-elt-using-dbt--rockset)
 * [Persistent Materializations Using dbt + Rockset](#persistent-materializations-using-dbt--rockset)
+* [Testing, Formatting, & Caveats](#testing-formatting-&-caveats)
 
 See the following blogs for additional information:
 * [Real-Time Analytics with dbt + Rockset](https://rockset.com/blog/real-time-analytics-with-dbt-rockset/)
@@ -131,8 +132,10 @@ You can use Table Models and Incremental Models (in conjunction with Rockset vie
 * Transform your streaming data during write-time.
 * Transform and persist them into Rockset collections via Incremental or Table Models.
 * Execute a sequence of view models during read-time to transform your data again.
-  
-## Testing Changes
+
+## Testing, Formatting, & Caveats
+
+### Testing Changes
 
 Install [dbt-adapter-tests](https://github.com/dbt-labs/dbt-adapter-tests) in order to run the tests:
 ```
@@ -145,7 +148,7 @@ pip3 install .
 pytest test/rockset.dbtspec
 ```
 
-## Formatting
+### Formatting
 
 Before landing a commit, format changes according to pep8 using these commands:
 ```
@@ -153,7 +156,7 @@ pip3 install autopep8
 autopep8 --in-place --recursive .
 ```
 
-## Caveats
+### Caveats
 1. `unique_key` is not supported with incremental, unless it is set to [_id](https://rockset.com/docs/special-fields/#the-_id-field), which acts as a natural `unique_key` in Rockset anyway.
 2. The `table` materialization is slower in Rockset than most due to Rockset's architecture as a low-latency, real-time database. Creating new collections requires provisioning hot storage to index and serve fresh data, which takes about a minute.
 3. Rockset queries have a two-minute timeout. Any model which runs a query that takes longer to execute than two minutes will fail.
