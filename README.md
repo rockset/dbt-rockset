@@ -8,7 +8,7 @@ The following subsections describe the adapter's installation procedure and supp
 * [Supported Materializations](#supported-materializations)
 * [Real-Time Streaming ELT Using dbt + Rockset](#real-time-streaming-elt-using-dbt--rockset)
 * [Persistent Materializations Using dbt + Rockset](#persistent-materializations-using-dbt--rockset)
-* [Testing, Formatting, & Caveats](#testing-formatting-&-caveats)
+* [Testing, Formatting, & Caveats](#testing-formatting--caveats)
 
 See the following blogs for additional information:
 * [Real-Time Analytics with dbt + Rockset](https://rockset.com/blog/real-time-analytics-with-dbt-rockset/)
