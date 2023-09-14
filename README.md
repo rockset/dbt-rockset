@@ -159,4 +159,4 @@ autopep8 --in-place --recursive .
 ### Caveats
 1. `unique_key` is not supported with incremental, unless it is set to [_id](https://rockset.com/docs/special-fields/#the-_id-field), which acts as a natural `unique_key` in Rockset anyway.
 2. The `table` materialization is slower in Rockset than most due to Rockset's architecture as a low-latency, real-time database. Creating new collections requires provisioning hot storage to index and serve fresh data, which takes about a minute.
-3. Rockset queries have a two-minute timeout. Any model which runs a query that takes longer to execute than two minutes will fail.
+3. Rockset queries have a two-minute timeout unless run asynchronously. You can extend this limit to 30 minutes by setting the run_async_iis to true. However, if the query ends up in the queue because you have hit your org's Concurrent Query Execution Limit (CQEL), the query must at least start execution before 2 minutes have passed. Otherwise, your IIS query will error. If the query leaves the queue and begins execution before 2 minutes have passed, the normal 30 minute time limit will apply.
