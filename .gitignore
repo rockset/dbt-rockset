@@ -8,3 +8,4 @@ dist/
 dbt/include/rockset/logs/
 dbt/include/rockset/target/
 venv/
+pytestdebug.log
