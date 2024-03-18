@@ -9,24 +9,18 @@ from dbt.logger import GLOBAL_LOGGER as logger
 import agate
 import dbt
 import rockset_sqlalchemy as sql
+from .__version__ import version as rs_version
 from typing import Any, Dict, List, Optional, Tuple, Union
-
-
-RS_APISERVERS = [
-    'api.euc1a1.rockset.com',
-    'api.rs2.usw2.rockset.com',
-    'api.usw2a1.rockset.com',
-    'api.use1a1.rockset.com',
-]
 
 
 @dataclass
 class RocksetCredentials(Credentials):
-    api_key: str
-    database: Optional[str]
-    api_server: Optional[str] = 'api.usw2a1.rockset.com'
+    database: str = "db"
     vi_rrn: Optional[str] = None
     run_async_iis: Optional[bool] = False
+    api_server: Optional[str] = 'api.usw2a1.rockset.com'
+    api_key: Optional[str] = None
+    schema: Optional[str] = None
 
     @property
     def type(self):
@@ -37,15 +31,7 @@ class RocksetCredentials(Credentials):
         return self.api_key
 
     def _connection_keys(self):
-        return ('api_key', 'workspace', 'schema')
-
-    @classmethod
-    def __pre_deserialize__(cls, d: Dict[Any, Any]) -> Dict[Any, Any]:
-        # `database` is not a required property in Rockset. Dbt still expects to
-        # see it in the credentials class in certain places, so put an arbitrary value
-        if 'database' not in d:
-            d['database'] = 'database'
-        return d
+        return ('api_key', 'apiserver', 'schema')
 
     _ALIASES = {
         'workspace': 'schema'
@@ -64,16 +50,16 @@ class RocksetConnectionManager(BaseConnectionManager):
         credentials = connection.credentials
 
         # Ensure the credentials have a valid apiserver before connecting to rockset
-        api_server_str = ', '.join(RS_APISERVERS)
-        if credentials.api_server not in RS_APISERVERS:
+        if not (credentials.api_server is not None and 'api' in credentials.api_server and credentials.api_server.endswith("rockset.com")):
             raise dbt.exceptions.NotImplementedException(
-                f'Invalid apiserver `{credentials.api_server}` specified in profile. Options are {api_server_str}')
+                f'Invalid apiserver `{credentials.api_server}` specified in profile. Expecting a server of the form api.<region>.rockset.com')
 
         try:
             handle = sql.connect(
                 api_server=credentials.api_server,
                 api_key=credentials.api_key
             )
+            handle._client.api_client.user_agent = 'dbt/' + rs_version
 
             connection.state = 'open'
             connection.handle = handle
@@ -110,13 +96,13 @@ class RocksetConnectionManager(BaseConnectionManager):
 
     # auto_begin is ignored in Rockset, and only included for consistency
     def execute(
-        self, sql: str, auto_begin: bool = False, fetch: bool = False
+        self, sql: str, auto_begin: bool = False, fetch: bool = False, limit: Optional[int] = None
     ) -> Tuple[Union[AdapterResponse, str], agate.Table]:
         sql = self._add_query_comment(sql)
         cursor = self.get_thread_connection().handle.cursor()
 
         if fetch:
-            rows, field_names = self._sql_to_results(cursor, sql)
+            rows, field_names = self._sql_to_results(cursor, sql, limit)
             table = agate_helper.table_from_data_flat(rows, field_names)
         else:
             cursor.execute(sql)
@@ -124,11 +110,14 @@ class RocksetConnectionManager(BaseConnectionManager):
 
         return AdapterResponse(_message='OK'), table
 
-    def _sql_to_results(self, cursor, sql):
+    def _sql_to_results(self, cursor, sql, limit):
         cursor.execute(sql)
         field_names = self._description_to_field_names(cursor.description)
         json_results = []
-        rows = cursor.fetchall()
+        if limit is None:
+            rows = cursor.fetchall()
+        else:
+            rows = cursor.fetchmany(limit)
         for row in rows:
             json_results.append(self._row_to_json(row, field_names))
         return json_results, field_names
