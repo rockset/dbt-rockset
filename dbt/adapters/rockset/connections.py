@@ -110,7 +110,7 @@ class RocksetConnectionManager(BaseConnectionManager):
 
     # auto_begin is ignored in Rockset, and only included for consistency
     def execute(
-        self, sql: str, auto_begin: bool = False, fetch: bool = False
+        self, sql: str, auto_begin: bool = False, fetch: bool = False, limit: Optional[int] = None
     ) -> Tuple[Union[AdapterResponse, str], agate.Table]:
         sql = self._add_query_comment(sql)
         cursor = self.get_thread_connection().handle.cursor()
