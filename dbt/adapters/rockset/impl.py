@@ -81,7 +81,12 @@ class RocksetAdapter(BaseAdapter):
             return
         rs.Workspaces.create(name=relation.schema)
         # Wait for workspace creation to complete
-        sleep(2)
+        for _ in range(10):
+            sleep(1)
+            current_workspaces = {ws.name for ws in rs.Workspaces.list().data}
+            if relation.schema in current_workspaces:
+                return
+            logger.info(f"Waiting for workspace {relation.schema} to be created")
 
     def drop_schema(self, relation: RocksetRelation) -> None:
         rs = self._rs_client()
@@ -338,8 +343,6 @@ class RocksetAdapter(BaseAdapter):
         )
 
         return catalog_table, []
-
-        pass
 
     # Rockset doesn't support DESCRIBE on views, so those are not included in the catalog information
     def get_catalog(self, manifest: Manifest) -> agate.Table:
