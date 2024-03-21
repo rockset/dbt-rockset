@@ -21,9 +21,9 @@
   {% endif %}
   {% set sql = load_csv_rows(model, agate_table) %}
 
-  {% call statement('main') -%}
-    {{ adapter.get_dummy_sql() }}
-  {%- endcall %}
+ {% call statement('main') -%}
+   {{ adapter.get_dummy_sql() }}
+ {%- endcall %}
 
   {% set target_relation = this.incorporate(type='table') %}
   {% do persist_docs(target_relation, model) %}
@@ -40,3 +40,4 @@
   {{ adapter.load_dataframe(model['database'], model['schema'], model['alias'],
                 agate_table, column_override) }}
 {% endmacro %}
+

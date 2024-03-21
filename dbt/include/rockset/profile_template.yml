@@ -1,0 +1,18 @@
+fixed:
+  type: rockset
+prompts:
+  api_key:
+    hint: "Your apikey"
+    hide_input: true
+  api_server:
+    default: api.usw2a1.rockset.com
+  user:
+    hint: "dev username"
+  vi_rrn:
+    hint: "Which Virtual Instance should operations be directed to"
+  run_async_iis:
+    hint: "Whether INSERT INTO queries should be run asynchronously. If your queries will exceed 2 minutes, you should enable this."
+  threads:
+    hint: "1 or more"
+    type: "int"
+    default: 1

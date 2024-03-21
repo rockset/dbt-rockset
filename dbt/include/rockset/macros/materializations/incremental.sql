@@ -15,10 +15,10 @@
     {{ adapter.add_incremental_docs(target_relation, sql, unique_key) }}
   {% endif %}
 
-  {#-- Rockset does not support CREATE TABLE sql. All logic to create / add docs to collections happens above --#}
-  {%- call statement('main') -%}
-    {{ adapter.get_dummy_sql() }}
-  {% endcall %}
+ {#-- Rockset does not support CREATE TABLE sql. All logic to create / add docs to collections happens above --#}
+ {%- call statement('main') -%}
+   {{ adapter.get_dummy_sql() }}
+ {% endcall %}
 
   {{ run_hooks(post_hooks) }}
 

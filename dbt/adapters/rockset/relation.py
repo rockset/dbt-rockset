@@ -1,8 +1,10 @@
 from dataclasses import dataclass, field
 from dbt.adapters.base.relation import BaseRelation, Policy
+from dbt.contracts.relation import (
+    RelationType)
 
 import traceback
-from typing import List, Optional
+from typing import List, Optional, Type
 
 
 @dataclass

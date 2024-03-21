@@ -104,7 +104,8 @@ Your data will be automatically kept up-to-date in real-time, and reflected in y
 
 If write-time transformations and views don't meet your application’s latency requirements (or your data transformations become too complex), you can persist them as Rockset collections.
 
-Rockset requires queries to complete in under two minutes to cater to real-time use cases, which may affect you if your read-time transformations are too complicated. This requires a batch ELT workflow to manually execute ```dbt run``` each time you want to update your data transformations. You can use micro-batching to frequently run dbt, to keep your transformed data up-to-date in near real-time.
+Rockset requires synchronous queries to complete in under two minutes to cater to real-time use cases, which may affect you if your read-time transformations are too complicated. This requires a batch ELT workflow to manually execute ```dbt run``` each time you want to update your data transformations. You can use micro-batching to frequently run dbt, to keep your transformed data up-to-date in near real-time.
+
 
 Persistent materializations are both faster to query and better at handling query concurrency, as they are materialized as collections in Rockset. Since the bulk of the data transformations have already been performed ahead of time, your queries will complete significantly faster because you can minimize the complexity necessary during read-time.
 

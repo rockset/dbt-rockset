@@ -4,8 +4,10 @@ __pycache__/
 .DS_Store
 build/
 dbt_rockset.egg-info/
+logs/**
 dist/
 dbt/include/rockset/logs/
 dbt/include/rockset/target/
 venv/
 pytestdebug.log
+.env
