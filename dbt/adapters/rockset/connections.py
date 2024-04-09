@@ -5,6 +5,7 @@ from dbt.adapters.base import BaseConnectionManager
 from dbt.clients import agate_helper
 from dbt.contracts.connection import AdapterResponse, Connection
 from dbt.logger import GLOBAL_LOGGER as logger
+from dbt.exceptions import NotImplementedError, DbtValidationError
 
 import agate
 import dbt
@@ -51,7 +52,7 @@ class RocksetConnectionManager(BaseConnectionManager):
 
         # Ensure the credentials have a valid apiserver before connecting to rockset
         if not (credentials.api_server is not None and 'api' in credentials.api_server and credentials.api_server.endswith("rockset.com")):
-            raise dbt.exceptions.NotImplementedException(
+            raise DbtValidationError(
                 f'Invalid apiserver `{credentials.api_server}` specified in profile. Expecting a server of the form api.<region>.rockset.com')
 
         try:
@@ -75,19 +76,19 @@ class RocksetConnectionManager(BaseConnectionManager):
         return 'OK'
 
     def cancel_open(self) -> Optional[List[str]]:
-        raise dbt.exceptions.NotImplementedException(
+        raise NotImplementedError(
             '`cancel_open` is not implemented for this adapter!'
         )
 
     def begin(self) -> None:
         """Begin a transaction. (passable)"""
-        raise dbt.exceptions.NotImplementedException(
+        raise NotImplementedError(
             '`begin` is not implemented for this adapter!'
         )
 
     def commit(self) -> None:
         """Commit a transaction. (passable)"""
-        raise dbt.exceptions.NotImplementedException(
+        raise NotImplementedError(
             '`commit` is not implemented for this adapter!'
         )
 
