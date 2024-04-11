@@ -6,6 +6,7 @@ from dbt.contracts.graph.manifest import Manifest
 from dbt.adapters.rockset.column import RocksetColumn
 from dbt.logger import GLOBAL_LOGGER as logger
 from dbt.adapters.base import BaseRelation
+from dbt.exceptions import NotImplementedError
 from .__version__ import version as rs_version
 
 import agate
@@ -13,11 +14,10 @@ import datetime
 import dbt
 import json
 import collections
-import os
 import requests
 import rockset
 from decimal import Decimal
-from time import sleep, time
+from time import sleep
 from typing import List, Optional, Set
 
 
@@ -137,7 +137,7 @@ class RocksetAdapter(BaseAdapter):
 
     # Relation/Collection related methods
     def truncate_relation(self, relation: RocksetRelation) -> None:
-        raise dbt.exceptions.NotImplementedException(
+        raise NotImplementedError(
             "`truncate` is not implemented for this adapter!"
         )
 
@@ -166,7 +166,7 @@ class RocksetAdapter(BaseAdapter):
     def rename_relation(
         self, from_relation: RocksetRelation, to_relation: RocksetRelation
     ) -> None:
-        raise dbt.exceptions.NotImplementedException(
+        raise NotImplementedError(
             "`rename` is not implemented for this adapter!"
         )
 
@@ -352,14 +352,14 @@ class RocksetAdapter(BaseAdapter):
     def expand_column_types(
         self, goal: RocksetRelation, current: RocksetRelation
     ) -> None:
-        raise dbt.exceptions.NotImplementedException(
+        raise NotImplementedError(
             "`expand_column_types` is not implemented for this adapter!"
         )
 
     def expand_target_column_types(
         self, from_relation: RocksetRelation, to_relation: RocksetRelation
     ) -> None:
-        raise dbt.exceptions.NotImplementedException(
+        raise NotImplementedError(
             "`expand_target_column_types` is not implemented for this adapter!"
         )
 
@@ -478,7 +478,7 @@ class RocksetAdapter(BaseAdapter):
     @available.parse(lambda *a, **k: "")
     def add_incremental_docs(self, relation, sql, unique_key):
         if unique_key and unique_key != "_id":
-            raise dbt.exceptions.NotImplementedException(
+            raise NotImplementedError(
                 "`unique_key` can only be set to `_id` with the Rockset adapter!"
             )
 
