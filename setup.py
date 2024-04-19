@@ -3,7 +3,7 @@ from setuptools import find_namespace_packages, setup
 
 package_name = "dbt-rockset"
 # make sure this always matches dbt/adapters/{adapter}/__version__.py
-package_version = "1.7.2"
+package_version = "1.7.3"
 description = """The Rockset adapter plugin for dbt"""
 
 setup(
