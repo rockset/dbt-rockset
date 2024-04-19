@@ -61,6 +61,8 @@ Type | Supported? | Details
 [Ephemeral](https://docs.getdbt.com/docs/building-a-dbt-project/building-models/materializations#ephemeral) | Yes | Create a CTE.
 [Incremental](https://docs.getdbt.com/docs/building-a-dbt-project/building-models/materializations#incremental) | YES | Creates a [Rockset collection](https://docs.rockset.com/collections/) if it doesn't exist, and writes to it.
 
+Query Lambda can be created and updated using dbt. See the tests for an example usage.
+
 ## Real-Time Streaming ELT Using dbt + Rockset
 
 As data is ingested, Rockset performs the following:
@@ -138,23 +140,19 @@ You can use Table Models and Incremental Models (in conjunction with Rockset vie
 
 ### Testing Changes
 
-Install [dbt-adapter-tests](https://github.com/dbt-labs/dbt-adapter-tests) in order to run the tests:
+Before landing a commit, ensure that your changes pass tests. Your credentials should be set in the .env file in the repo root. See the test.env file for an example. Once the .env file is set, you can run the tests using the following command.
 ```
-pip3 install pytest-dbt-adapter
-```
-
-Before landing a commit, ensure that your changes pass tests by inserting an api key for any active Rockset org in `test/rockset.dbtspec`, and then running these two commands to install your changes in your local environment and run our test suite:
-```
-pip3 install .
-pytest test/rockset.dbtspec
+pytest -s tests/functional
 ```
 
 ### Formatting
 
-Before landing a commit, format changes according to pep8 using these commands:
+Before landing a commit format changes using [black](https://github.com/psf/black).
 ```
-pip3 install autopep8
-autopep8 --in-place --recursive .
+# Install
+python -m pip install black
+# Usage (From repo root)
+python -m black .
 ```
 
 ### Caveats
