@@ -13,17 +13,17 @@ pytest_plugins = ["dbt.tests.fixtures.project"]
 @pytest.fixture(scope="class")
 def dbt_profile_target():
     return {
-        'type': 'rockset',
-        'threads': 1,
-        'database': 'db',
-        'api_key': os.getenv('API_KEY'),
-        'api_server': os.getenv('API_SERVER'),
-        'vi_rrn': os.getenv('VI_RRN'),
-        'run_async_iis': os.getenv('USE_ASYNC').lower() == "true",
+        "type": "rockset",
+        "threads": 1,
+        "database": "db",
+        "api_key": os.getenv("API_KEY"),
+        "api_server": os.getenv("API_SERVER"),
+        "vi_rrn": os.getenv("VI_RRN"),
+        "run_async_iis": os.getenv("USE_ASYNC").lower() == "true",
     }
 
 
-@pytest.fixture(scope='session', autouse=True)
+@pytest.fixture(scope="session", autouse=True)
 def load_env():
-    env_file = find_dotenv('.env')
+    env_file = find_dotenv(".env")
     load_dotenv(env_file)

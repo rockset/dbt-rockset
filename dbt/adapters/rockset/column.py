@@ -9,16 +9,16 @@ import rockset
 @dataclass
 class RocksetColumn(Column):
     def is_integer(self) -> bool:
-        return self.dtype.lower() in ['int']
+        return self.dtype.lower() in ["int"]
 
     def is_numeric(self) -> bool:
-        return self.dtype.lower() in ['int', 'float']
+        return self.dtype.lower() in ["int", "float"]
 
     def is_float(self):
-        return self.dtype.lower() in ['float']
+        return self.dtype.lower() in ["float"]
 
     def is_string(self):
-        return self.dtype.lower() in ['string']
+        return self.dtype.lower() in ["string"]
 
     def string_size(self) -> int:
         if not self.is_string():

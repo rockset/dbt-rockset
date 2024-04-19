@@ -2,7 +2,7 @@ import pytest
 
 from dbt.tests.adapter.basic.test_singular_tests import BaseSingularTests
 from dbt.tests.adapter.basic.test_singular_tests_ephemeral import (
-    BaseSingularTestsEphemeral
+    BaseSingularTestsEphemeral,
 )
 from dbt.tests.adapter.basic.test_empty import BaseEmpty
 from dbt.tests.adapter.basic.test_incremental import BaseIncremental

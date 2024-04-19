@@ -16,8 +16,5 @@ setup(
     url="https://github.com/rockset/dbt-rockset",
     packages=find_namespace_packages(include=["dbt", "dbt.*"]),
     include_package_data=True,
-    install_requires=[
-        "dbt-core~=1.7.0",
-        "rockset_sqlalchemy~=0.0.1"
-    ],
+    install_requires=["dbt-core~=1.7.0", "rockset_sqlalchemy~=0.0.1"],
 )

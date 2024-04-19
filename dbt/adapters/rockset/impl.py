@@ -104,12 +104,10 @@ class RocksetAdapter(BaseAdapter):
             self._delete_alias(ws, alias.name)
         # Drop all collections in the ws
         for collection in rs.Collections.workspace_collections(workspace=ws).data:
-            self._delete_collection(
-                ws, collection.name, wait_until_deleted=False)
-       # Drop all QLs in the ws
+            self._delete_collection(ws, collection.name, wait_until_deleted=False)
+        # Drop all QLs in the ws
         for ql in rs.QueryLambdas.list_query_lambdas_in_workspace(workspace=ws).data:
             self._delete_ql(ws, ql.name)
-
 
         try:
             # Wait until the ws has 0 collections. We do this so deletion of multiple collections
@@ -119,8 +117,7 @@ class RocksetAdapter(BaseAdapter):
                 if workspace.collection_count == 0:
                     break
                 logger.debug(
-                    f"Waiting for ws {ws} to have 0 collections, has {
-                        workspace.collection_count}"
+                    f"Waiting for ws {ws} to have 0 collections, has {workspace.collection_count}"
                 )
                 sleep(3)
 
@@ -142,9 +139,7 @@ class RocksetAdapter(BaseAdapter):
 
     # Relation/Collection related methods
     def truncate_relation(self, relation: RocksetRelation) -> None:
-        raise NotImplementedError(
-            "`truncate` is not implemented for this adapter!"
-        )
+        raise NotImplementedError("`truncate` is not implemented for this adapter!")
 
     @available.parse(lambda *a, **k: "")
     def get_dummy_sql(self):
@@ -164,16 +159,13 @@ class RocksetAdapter(BaseAdapter):
             self._delete_collection(ws, identifier)
         else:
             raise dbt.exceptions.Exception(
-                f"Tried to drop relation {ws}.{
-                    identifier} that does not exist!"
+                f"Tried to drop relation {ws}.{identifier} that does not exist!"
             )
 
     def rename_relation(
         self, from_relation: RocksetRelation, to_relation: RocksetRelation
     ) -> None:
-        raise NotImplementedError(
-            "`rename` is not implemented for this adapter!"
-        )
+        raise NotImplementedError("`rename` is not implemented for this adapter!")
 
     @available.parse(lambda *a, **k: "")
     def get_collection(self, relation) -> RocksetRelation:
@@ -182,11 +174,12 @@ class RocksetAdapter(BaseAdapter):
 
         try:
             rs = self._rs_client()
-            existing_collection = rs.Collections.get(
-                collection=cname, workspace=ws)
+            existing_collection = rs.Collections.get(collection=cname, workspace=ws)
             return self._rs_collection_to_relation(existing_collection)
         except Exception as e:
-            if hasattr(e, "status") and e.status == NOT_FOUND:  # Collection does not exist
+            if (
+                hasattr(e, "status") and e.status == NOT_FOUND
+            ):  # Collection does not exist
                 return None
             else:  # Unexpected error
                 raise e
@@ -209,8 +202,7 @@ class RocksetAdapter(BaseAdapter):
         rs = self._rs_client()
         relations = []
 
-        collections = rs.Collections.workspace_collections(
-            workspace=schema).data
+        collections = rs.Collections.workspace_collections(workspace=schema).data
         for collection in collections:
             relations.append(self._rs_collection_to_relation(collection))
         return relations
@@ -255,17 +247,13 @@ class RocksetAdapter(BaseAdapter):
         self, manifest: Manifest, relations: Optional[Set[BaseRelation]] = None
     ):
         catalogs: agate.Table
-        if (
-            relations is None
-            or len(relations) > 100
-        ):
+        if relations is None or len(relations) > 100:
             # Do it the traditional way. We get the full catalog.
             catalogs, exceptions = self.get_catalog(manifest)
         else:
             # Do it the new way. We try to save time by selecting information
             # only for the exact set of relations we are interested in.
-            catalogs, exceptions = self.get_catalog_by_relations(
-                manifest, relations)
+            catalogs, exceptions = self.get_catalog_by_relations(manifest, relations)
 
         if relations and catalogs:
             relation_map = {
@@ -287,7 +275,9 @@ class RocksetAdapter(BaseAdapter):
 
         return catalogs, exceptions
 
-    def get_catalog_by_relations(self, manifest: Manifest, relations: List[RocksetRelation]):
+    def get_catalog_by_relations(
+        self, manifest: Manifest, relations: List[RocksetRelation]
+    ):
         rs = self._rs_client()
 
         columns = [
@@ -309,10 +299,13 @@ class RocksetAdapter(BaseAdapter):
         ]
         catalog_rows = []
         databases = {x.database for x in manifest.sources.values()} | {
-            x.database for x in manifest.nodes.values()}
+            x.database for x in manifest.nodes.values()
+        }
         # DB is not a thing in RS. Include all DBs to be filtered out in later stages of catalog generation
         for relation in relations:
-            for collection in rs.Collections.workspace_collections(workspace=relation.schema).data:
+            for collection in rs.Collections.workspace_collections(
+                workspace=relation.schema
+            ).data:
                 rel = self.Relation.create(
                     schema=collection.workspace, identifier=collection.name
                 )
@@ -342,8 +335,7 @@ class RocksetAdapter(BaseAdapter):
             rows=catalog_rows,
             column_names=columns,
             column_types=agate.TypeTester(
-                force={"table_database": agate.Text(
-                    cast_nulls=False, null_values=[])}
+                force={"table_database": agate.Text(cast_nulls=False, null_values=[])}
             ),
         )
 
@@ -379,6 +371,7 @@ class RocksetAdapter(BaseAdapter):
     @available.parse(lambda *a, **k: "")
     def do_debug(self, obj):
         import pdb
+
         pdb.set_trace()
 
     @available.parse(lambda *a, **k: "")
@@ -410,14 +403,15 @@ class RocksetAdapter(BaseAdapter):
                 sql=QueryLambdaSql(
                     default_parameters=query_params,
                     query=sql,
-                ))
+                ),
+            )
             ql_version = api_response.data.version
             for t in tags:
                 self._add_query_lambda_tag(ws, name, ql_version, t)
         except ApiException as e:
             logger.error(e)
             raise e
- 
+
     def _create_query_lambda(self, ws, name, sql, tags, parameters):
         rs = self._rs_client()
         query_params = [QueryParameter(**qp) for qp in parameters]
@@ -430,27 +424,31 @@ class RocksetAdapter(BaseAdapter):
                 sql=QueryLambdaSql(
                     default_parameters=query_params,
                     query=sql,
-                ))
+                ),
+            )
             ql_version = api_response.data.version
             for t in tags:
                 self._add_query_lambda_tag(ws, name, ql_version, t)
         except ApiException as e:
             logger.error(e)
             raise e
-    
+
     def _add_query_lambda_tag(self, ws, name, version, tag):
         rs = self._rs_client()
         api_response = rs.QueryLambdas.create_query_lambda_tag(
-        workspace=ws,
-        query_lambda=name,
-        tag_name=tag,
-        version=version,)
+            workspace=ws,
+            query_lambda=name,
+            tag_name=tag,
+            version=version,
+        )
 
     def _query_lambda_exists(self, ws, name):
         # Check if latest tag exists
         rs = self._rs_client()
         try:
-            resp = rs.QueryLambdas.get_query_lambda_tag_version(workspace=ws,query_lambda=name, tag="latest")
+            resp = rs.QueryLambdas.get_query_lambda_tag_version(
+                workspace=ws, query_lambda=name, tag="latest"
+            )
             return True
         except ApiException as e:
             if e.status == 404:
@@ -501,8 +499,7 @@ class RocksetAdapter(BaseAdapter):
 
         # The check for a view should happen before this point
         if self._does_view_exist(ws, cname):
-            raise dbt.exceptions.Exception(
-                f"InternalError : View {ws}.{cname} exists")
+            raise dbt.exceptions.Exception(f"InternalError : View {ws}.{cname} exists")
 
         # Create the Rockset collection
         if not self._does_collection_exist(ws, cname):
@@ -513,8 +510,7 @@ class RocksetAdapter(BaseAdapter):
         # Write the results to the collection and wait until the docs are ingested
         body = {"data": json_docs}
         write_api_endpoint = f"/v1/orgs/self/ws/{ws}/collections/{cname}/docs"
-        resp = json.loads(self._send_rs_request(
-            "POST", write_api_endpoint, body).text)
+        resp = json.loads(self._send_rs_request("POST", write_api_endpoint, body).text)
         self._wait_until_past_commit_fence(ws, cname, resp["last_offset"])
 
     def _convert_agate_data_type(self, v):
@@ -598,8 +594,7 @@ class RocksetAdapter(BaseAdapter):
                 relation.schema, relation.identifier, query_id
             )
         else:
-            logger.info(
-                f"Query {query_id} inserted 0 docs; no ingest to wait for.")
+            logger.info(f"Query {query_id} inserted 0 docs; no ingest to wait for.")
 
     # Execute a query not using the SQL cursor, but by hitting the REST api. This should be done
     # if you need the QueryResponse object returned
@@ -609,10 +604,9 @@ class RocksetAdapter(BaseAdapter):
         logger.debug(f"Executing sql: {iis_sql}")
 
         if self._rs_vi_rrn():
-            endpoint = f"/v1/orgs/self/virtualinstances/{
-                self._rs_vi_rrn()}/queries"
+            endpoint = f"/v1/orgs/self/virtualinstances/{self._rs_vi_rrn()}/queries"
         else:
-            endpoint = '/v1/orgs/self/queries'
+            endpoint = "/v1/orgs/self/queries"
 
         body = {
             "sql": {"query": iis_sql},
@@ -634,8 +628,9 @@ class RocksetAdapter(BaseAdapter):
             # and get num_docs_inserted
             return query_id, 1
 
-        assert len(
-            json_resp["results"]) == 1, f"IIS queries should return only one document but got {len(json_resp['results'])}"
+        assert (
+            len(json_resp["results"]) == 1
+        ), f"IIS queries should return only one document but got {len(json_resp['results'])}"
 
         return query_id, json_resp["results"][0]["num_docs_inserted"]
 
@@ -643,11 +638,12 @@ class RocksetAdapter(BaseAdapter):
         while True:
             try:
                 self._rs_client().Collections.get(collection=cname, workspace=ws)
-                logger.debug(
-                    f"Waiting for collection {ws}.{cname} to be deleted...")
+                logger.debug(f"Waiting for collection {ws}.{cname} to be deleted...")
                 sleep(3)
             except Exception as e:
-                if hasattr(e, "status") and e.status == NOT_FOUND:  # Collection does not exist
+                if (
+                    hasattr(e, "status") and e.status == NOT_FOUND
+                ):  # Collection does not exist
                     return
                 raise e
 
@@ -667,8 +663,7 @@ class RocksetAdapter(BaseAdapter):
         while total_sleep_time < max_wait_time_secs:
             if not self._does_collection_exist(ws, cname):
                 logger.debug(
-                    f"Collection {ws}.{
-                        cname} does not exist. This is likely a transient consistency error."
+                    f"Collection {ws}.{cname} does not exist. This is likely a transient consistency error."
                 )
                 sleep(sleep_secs)
                 total_sleep_time += sleep_secs
@@ -679,14 +674,12 @@ class RocksetAdapter(BaseAdapter):
                 logger.debug(f"{ws}.{cname} is ready!")
                 return
             else:
-                logger.debug(
-                    f"Waiting for collection {ws}.{cname} to become ready...")
+                logger.debug(f"Waiting for collection {ws}.{cname} to become ready...")
                 sleep(sleep_secs)
                 total_sleep_time += sleep_secs
 
         raise dbt.exceptions.Exception(
-            f"Waited more than {max_wait_time_secs} secs for {
-                ws}.{cname} to become ready. Something is wrong."
+            f"Waited more than {max_wait_time_secs} secs for {ws}.{cname} to become ready. Something is wrong."
         )
 
     def _rs_collection_to_relation(self, collection):
@@ -715,8 +708,7 @@ class RocksetAdapter(BaseAdapter):
     def _wait_until_collection_deleted(self, ws, cname):
         while True:
             if self._does_collection_exist(ws, cname):
-                logger.debug(
-                    f"Waiting for collection {ws}.{cname} to be deleted")
+                logger.debug(f"Waiting for collection {ws}.{cname} to be deleted")
                 sleep(3)
             else:
                 break
@@ -731,8 +723,7 @@ class RocksetAdapter(BaseAdapter):
             c = rs.Collections.delete(collection=cname, workspace=ws)
 
             if wait_until_deleted:
-                self._wait_until_collection_deleted(
-                    ws, cname)
+                self._wait_until_collection_deleted(ws, cname)
         except Exception as e:
             if hasattr(e, "status") and e.status != NOT_FOUND:
                 raise e  # Unexpected error
@@ -745,7 +736,7 @@ class RocksetAdapter(BaseAdapter):
         except Exception as e:
             if hasattr(e, "status") and e.status != NOT_FOUND:
                 raise e  # Unexpected error
-    
+
     def _wait_until_ql_deleted(self, ws, ql):
         while True:
             if self._query_lambda_exists(ws, ql):
@@ -753,7 +744,6 @@ class RocksetAdapter(BaseAdapter):
                 sleep(3)
             else:
                 break
-
 
     def _delete_alias(self, ws, alias):
         rs = self._rs_client()
@@ -770,8 +760,7 @@ class RocksetAdapter(BaseAdapter):
 
     def _wait_until_past_commit_fence(self, ws, cname, fence):
         endpoint = (
-            f"/v1/orgs/self/ws/{ws}/collections/{
-                cname}/offsets/commit?fence={fence}"
+            f"/v1/orgs/self/ws/{ws}/collections/{cname}/offsets/commit?fence={fence}"
         )
         while True:
             resp = self._send_rs_request("GET", endpoint)
@@ -780,14 +769,12 @@ class RocksetAdapter(BaseAdapter):
             commit_offset = resp_json["offsets"]["commit"]
             if passed:
                 logger.debug(
-                    f"Commit offset {
-                        commit_offset} is past given fence {fence}"
+                    f"Commit offset {commit_offset} is past given fence {fence}"
                 )
                 break
             else:
                 logger.debug(
-                    f"Waiting for commit offset to pass fence {
-                        fence}; it is currently {commit_offset}"
+                    f"Waiting for commit offset to pass fence {fence}; it is currently {commit_offset}"
                 )
                 sleep(3)
 
@@ -797,17 +784,17 @@ class RocksetAdapter(BaseAdapter):
             query_resp = self._send_rs_request("GET", endpoint)
             query_data = json.loads(query_resp.text)
 
-            status = query_data.get("data").get(
-                "status") if "data" in query_data else None
+            status = (
+                query_data.get("data").get("status") if "data" in query_data else None
+            )
             if status == "COMPLETED":
                 return
             elif status == "ERROR" or status == "CANCELLED":
                 raise Exception(
-                    f"IIS query did not complete successfully. Query data: {query_resp.text}")
-            else:
-                logger.debug(
-                    f"Insert Into Query not completed yet"
+                    f"IIS query did not complete successfully. Query data: {query_resp.text}"
                 )
+            else:
+                logger.debug(f"Insert Into Query not completed yet")
                 sleep(3)
 
     def _wait_until_iis_fully_ingested(self, ws, cname, query_id):
@@ -831,9 +818,11 @@ class RocksetAdapter(BaseAdapter):
 
     def _send_rs_request(self, type, endpoint, body=None, check_success=True):
         url = self._rs_api_server() + endpoint
-        version = 'dbt/' + rs_version
-        headers = {"authorization": f"apikey {
-            self._rs_api_key()}", "user-agent": version}
+        version = "dbt/" + rs_version
+        headers = {
+            "authorization": f"apikey {self._rs_api_key()}",
+            "user-agent": version,
+        }
 
         if type == "GET":
             resp = requests.get(url, headers=headers)
@@ -866,8 +855,7 @@ class RocksetAdapter(BaseAdapter):
             return True
         else:
             raise Exception(
-                f"throwing from 332 with status_code {
-                    response.status_code} and text {response.text}"
+                f"throwing from 332 with status_code {response.status_code} and text {response.text}"
             )
 
     def _does_alias_exist(self, ws, alias):
@@ -916,8 +904,7 @@ class RocksetAdapter(BaseAdapter):
             return
         elif del_resp.status_code != OK:
             raise Exception(
-                f"throwing from 395 with code {
-                    del_resp.status_code} and text {del_resp.text}"
+                f"throwing from 395 with code {del_resp.status_code} and text {del_resp.text}"
             )
 
         self._wait_until_view_does_not_exist(ws, view)
@@ -950,8 +937,7 @@ class RocksetAdapter(BaseAdapter):
         while total_sleep_time < max_wait_time_secs:
             if not self._does_view_exist(ws, view):
                 logger.debug(
-                    f"View {ws}.{
-                        view} does not exist. This is likely a transient consistency error."
+                    f"View {ws}.{view} does not exist. This is likely a transient consistency error."
                 )
                 sleep(sleep_secs)
                 total_sleep_time += sleep_secs
@@ -962,18 +948,15 @@ class RocksetAdapter(BaseAdapter):
             state = view_json["state"]
 
             if state == "SYNCING":
-                logger.debug(
-                    f"Waiting for view {ws}.{view} to be fully synced")
+                logger.debug(f"Waiting for view {ws}.{view} to be fully synced")
                 sleep(sleep_secs)
                 total_sleep_time += sleep_secs
             else:
-                logger.debug(
-                    f"View {ws}.{view} is synced and ready to be queried")
+                logger.debug(f"View {ws}.{view} is synced and ready to be queried")
                 return
 
         raise dbt.exceptions.Exception(
-            f"Waited more than {max_wait_time_secs} secs for view {
-                ws}.{view} to become synced. Something is wrong."
+            f"Waited more than {max_wait_time_secs} secs for view {ws}.{view} to become synced. Something is wrong."
         )
 
     def run_sql_for_tests(self, sql, fetch, conn):
@@ -989,7 +972,7 @@ class RocksetAdapter(BaseAdapter):
             logger.error(e)
             raise
         finally:
-            conn.state = 'close'
+            conn.state = "close"
 
     # Overridden because Rockset generates columns not added during testing.
     def get_rows_different_sql(
@@ -1006,13 +989,11 @@ class RocksetAdapter(BaseAdapter):
         if column_names is None:
             columns = self.get_columns_in_relation(relation_a)
             names = sorted(
-                (self.quote(c.name)
-                 for c in columns if c.name not in skip_cmp_columns)
+                (self.quote(c.name) for c in columns if c.name not in skip_cmp_columns)
             )
         else:
             names = sorted(
-                (self.quote(n)
-                 for n in column_names if n not in skip_cmp_columns)
+                (self.quote(n) for n in column_names if n not in skip_cmp_columns)
             )
         columns_csv = ", ".join(names)
 

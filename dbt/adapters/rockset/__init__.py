@@ -11,4 +11,5 @@ from dbt.include import rockset
 Plugin = AdapterPlugin(
     adapter=RocksetAdapter,
     credentials=RocksetCredentials,
-    include_path=rockset.PACKAGE_PATH)
+    include_path=rockset.PACKAGE_PATH,
+)
