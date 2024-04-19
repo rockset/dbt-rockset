@@ -16,6 +16,8 @@ import json
 import collections
 import requests
 import rockset
+from rockset.models import *
+from rockset import ApiException
 from decimal import Decimal
 from time import sleep
 from typing import List, Optional, Set
@@ -100,11 +102,14 @@ class RocksetAdapter(BaseAdapter):
         # Drop all aliases in the ws
         for alias in rs.Aliases.workspace_aliases(workspace=ws).data:
             self._delete_alias(ws, alias.name)
-
         # Drop all collections in the ws
         for collection in rs.Collections.workspace_collections(workspace=ws).data:
             self._delete_collection(
                 ws, collection.name, wait_until_deleted=False)
+       # Drop all QLs in the ws
+        for ql in rs.QueryLambdas.list_query_lambdas_in_workspace(workspace=ws).data:
+            self._delete_ql(ws, ql.name)
+
 
         try:
             # Wait until the ws has 0 collections. We do this so deletion of multiple collections
@@ -379,6 +384,79 @@ class RocksetAdapter(BaseAdapter):
     @available.parse(lambda *a, **k: "")
     def apply_snapshot(self, relation, sql):
         raise dbt.exceptions.Exception("Snapshots unsupported")
+
+    # Query Lambda materialization
+    @available.parse(lambda *a, **k: "")
+    def create_or_update_query_lambda(self, relation, sql, tags, parameters):
+        ws = relation.schema
+        name = relation.identifier
+        # Ensure workspace exists
+        self.create_schema(relation)
+
+        if self._query_lambda_exists(ws, name):
+            self._update_query_lambda(ws, name, sql, tags, parameters)
+        else:
+            self._create_query_lambda(ws, name, sql, tags, parameters)
+
+    def _update_query_lambda(self, ws, name, sql, tags, parameters):
+        rs = self._rs_client()
+        query_params = [QueryParameter(**qp) for qp in parameters]
+        try:
+            api_response = rs.QueryLambdas.update_query_lambda(
+                workspace=ws,
+                description="Created via DBT",
+                is_public=False,
+                query_lambda=name,
+                sql=QueryLambdaSql(
+                    default_parameters=query_params,
+                    query=sql,
+                ))
+            ql_version = api_response.data.version
+            for t in tags:
+                self._add_query_lambda_tag(ws, name, ql_version, t)
+        except ApiException as e:
+            logger.error(e)
+            raise e
+ 
+    def _create_query_lambda(self, ws, name, sql, tags, parameters):
+        rs = self._rs_client()
+        query_params = [QueryParameter(**qp) for qp in parameters]
+        try:
+            api_response = rs.QueryLambdas.create_query_lambda(
+                workspace=ws,
+                description="Created via DBT",
+                is_public=False,
+                name=name,
+                sql=QueryLambdaSql(
+                    default_parameters=query_params,
+                    query=sql,
+                ))
+            ql_version = api_response.data.version
+            for t in tags:
+                self._add_query_lambda_tag(ws, name, ql_version, t)
+        except ApiException as e:
+            logger.error(e)
+            raise e
+    
+    def _add_query_lambda_tag(self, ws, name, version, tag):
+        rs = self._rs_client()
+        api_response = rs.QueryLambdas.create_query_lambda_tag(
+        workspace=ws,
+        query_lambda=name,
+        tag_name=tag,
+        version=version,)
+
+    def _query_lambda_exists(self, ws, name):
+        # Check if latest tag exists
+        rs = self._rs_client()
+        try:
+            resp = rs.QueryLambdas.get_query_lambda_tag_version(workspace=ws,query_lambda=name, tag="latest")
+            return True
+        except ApiException as e:
+            if e.status == 404:
+                return False
+            else:
+                raise e
 
     # Table materialization
     @available.parse(lambda *a, **k: "")
@@ -658,6 +736,24 @@ class RocksetAdapter(BaseAdapter):
         except Exception as e:
             if hasattr(e, "status") and e.status != NOT_FOUND:
                 raise e  # Unexpected error
+
+    def _delete_ql(self, ws, ql):
+        rs = self._rs_client()
+        try:
+            rs.QueryLambdas.delete_query_lambda(query_lambda=ql, workspace=ws)
+            self._wait_until_ql_deleted(ws, ql)
+        except Exception as e:
+            if hasattr(e, "status") and e.status != NOT_FOUND:
+                raise e  # Unexpected error
+    
+    def _wait_until_ql_deleted(self, ws, ql):
+        while True:
+            if self._query_lambda_exists(ws, ql):
+                logger.debug(f"Waiting for ql {ws}.{ql} to be deleted")
+                sleep(3)
+            else:
+                break
+
 
     def _delete_alias(self, ws, alias):
         rs = self._rs_client()
