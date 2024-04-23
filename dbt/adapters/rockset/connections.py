@@ -19,85 +19,85 @@ class RocksetCredentials(Credentials):
     database: str = "db"
     vi_rrn: Optional[str] = None
     run_async_iis: Optional[bool] = False
-    api_server: Optional[str] = 'api.usw2a1.rockset.com'
+    api_server: Optional[str] = "api.usw2a1.rockset.com"
     api_key: Optional[str] = None
     schema: Optional[str] = None
 
     @property
     def type(self):
-        return 'rockset'
+        return "rockset"
 
     @property
     def unique_field(self):
         return self.api_key
 
     def _connection_keys(self):
-        return ('api_key', 'apiserver', 'schema')
+        return ("api_key", "apiserver", "schema")
 
-    _ALIASES = {
-        'workspace': 'schema'
-    }
+    _ALIASES = {"workspace": "schema"}
 
 
 class RocksetConnectionManager(BaseConnectionManager):
-    TYPE = 'rockset'
+    TYPE = "rockset"
 
     @classmethod
     def open(cls, connection: Connection) -> Connection:
-        if connection.state == 'open':
-            logger.debug('Connection is already open, skipping open.')
+        if connection.state == "open":
+            logger.debug("Connection is already open, skipping open.")
             return connection
 
         credentials = connection.credentials
 
         # Ensure the credentials have a valid apiserver before connecting to rockset
-        if not (credentials.api_server is not None and 'api' in credentials.api_server and credentials.api_server.endswith("rockset.com")):
+        if not (
+            credentials.api_server is not None
+            and "api" in credentials.api_server
+            and credentials.api_server.endswith("rockset.com")
+        ):
             raise DbtValidationError(
-                f'Invalid apiserver `{credentials.api_server}` specified in profile. Expecting a server of the form api.<region>.rockset.com')
+                f"Invalid apiserver `{credentials.api_server}` specified in profile. Expecting a server of the form api.<region>.rockset.com"
+            )
 
         try:
             handle = sql.connect(
-                api_server=credentials.api_server,
-                api_key=credentials.api_key
+                api_server=credentials.api_server, api_key=credentials.api_key
             )
-            handle._client.api_client.user_agent = 'dbt/' + rs_version
+            handle._client.api_client.user_agent = "dbt/" + rs_version
 
-            connection.state = 'open'
+            connection.state = "open"
             connection.handle = handle
             return connection
         except Exception as e:
-            connection.state = 'fail'
+            connection.state = "fail"
             connection.handle = None
             raise dbt.exceptions.FailedToConnectException(e)
 
     @classmethod
     def get_status(cls, cursor) -> str:
         # Rockset cursors don't have a status_message
-        return 'OK'
+        return "OK"
 
     def cancel_open(self) -> Optional[List[str]]:
-        raise NotImplementedError(
-            '`cancel_open` is not implemented for this adapter!'
-        )
+        raise NotImplementedError("`cancel_open` is not implemented for this adapter!")
 
     def begin(self) -> None:
         """Begin a transaction. (passable)"""
-        raise NotImplementedError(
-            '`begin` is not implemented for this adapter!'
-        )
+        raise NotImplementedError("`begin` is not implemented for this adapter!")
 
     def commit(self) -> None:
         """Commit a transaction. (passable)"""
-        raise NotImplementedError(
-            '`commit` is not implemented for this adapter!'
-        )
+        raise NotImplementedError("`commit` is not implemented for this adapter!")
 
     def clear_transaction(self) -> None:
         pass
 
     # auto_begin is ignored in Rockset, and only included for consistency
     def execute(
-        self, sql: str, auto_begin: bool = False, fetch: bool = False, limit: Optional[int] = None
+        self,
+        sql: str,
+        auto_begin: bool = False,
+        fetch: bool = False,
+        limit: Optional[int] = None,
     ) -> Tuple[Union[AdapterResponse, str], agate.Table]:
         sql = self._add_query_comment(sql)
         cursor = self.get_thread_connection().handle.cursor()
@@ -109,7 +109,7 @@ class RocksetConnectionManager(BaseConnectionManager):
             cursor.execute(sql)
             table = agate_helper.empty_table()
 
-        return AdapterResponse(_message='OK'), table
+        return AdapterResponse(_message="OK"), table
 
     def _sql_to_results(self, cursor, sql, limit):
         cursor.execute(sql)
@@ -141,4 +141,4 @@ class RocksetConnectionManager(BaseConnectionManager):
 
     @classmethod
     def get_response(cls, cursor) -> str:
-        return 'OK'
+        return "OK"
