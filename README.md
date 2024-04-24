@@ -85,6 +85,8 @@ limit :limit
 
 See the [tests](https://github.com/rockset/dbt-rockset/blob/master/tests/functional/adapter/test_query_lambda.py) for more example usages.
 
+>:warning: Query Lambdas cannot be referenced as a model in other dbt models as they cannot be executed from dbt. 
+
 ## Real-Time Streaming ELT Using dbt + Rockset
 
 As data is ingested, Rockset performs the following:
