@@ -61,7 +61,31 @@ Type | Supported? | Details
 [Ephemeral](https://docs.getdbt.com/docs/building-a-dbt-project/building-models/materializations#ephemeral) | Yes | Create a CTE.
 [Incremental](https://docs.getdbt.com/docs/building-a-dbt-project/building-models/materializations#incremental) | YES | Creates a [Rockset collection](https://docs.rockset.com/collections/) if it doesn't exist, and writes to it.
 
-Query Lambda can be created and updated using dbt. See the tests for an example usage.
+### Query Lambda Configuration
+[Query Lambdas](https://docs.rockset.com/documentation/docs/query-lambdas) can be created and updated using dbt. 
+To manage a Query Lamdba using dbt, a materialization of 'query_lambda' should be used.
+For example,
+```
+{{
+    config(
+        materialized='query_lambda',
+        tags=['example_tag'],
+        parameters=[
+            {'name': 'order_id', 'type': 'string', 'value': 'xyz'},
+            {'name': 'limit', 'type': 'int', 'value': '10'},
+        ]
+    )
+}}
+
+select * from {{ ref('orders') }} 
+where order_id = :order_id
+order by order_time
+limit :limit
+```
+
+See the [tests](https://github.com/rockset/dbt-rockset/blob/master/tests/functional/adapter/test_query_lambda.py) for more example usages.
+
+>:warning: Query Lambdas cannot be referenced as a model in other dbt models as they cannot be executed from dbt. 
 
 ## Real-Time Streaming ELT Using dbt + Rockset
 
