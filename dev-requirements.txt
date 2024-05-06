@@ -30,7 +30,7 @@ ipdb==0.13.13
 ipython==8.22.2
 isodate==0.6.1
 jedi==0.19.1
-Jinja2==3.1.2
+Jinja2==3.1.4
 jsonschema==4.19.2
 jsonschema-specifications==2023.7.1
 leather==0.3.4
