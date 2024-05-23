@@ -16,6 +16,7 @@ import json
 import collections
 import requests
 import rockset
+import backoff
 from rockset.models import *
 from rockset import ApiException
 from decimal import Decimal
@@ -30,6 +31,13 @@ ASYNC_OPTIONS = {
     "timeout_ms": 1800000,
     "max_initial_results": 1,
 }
+
+
+def fatal_code(e: ApiException):
+    if e.status == 429:
+        return False
+    else:
+        return 400 <= e.status < 500
 
 
 class RocksetAdapter(BaseAdapter):
@@ -380,6 +388,7 @@ class RocksetAdapter(BaseAdapter):
 
     # Query Lambda materialization
     @available.parse(lambda *a, **k: "")
+    @backoff.on_exception(backoff.expo, ApiException, max_tries=20, giveup=fatal_code)
     def create_or_update_query_lambda(self, relation, sql, tags, parameters):
         ws = relation.schema
         name = relation.identifier
@@ -728,6 +737,7 @@ class RocksetAdapter(BaseAdapter):
             if hasattr(e, "status") and e.status != NOT_FOUND:
                 raise e  # Unexpected error
 
+    @backoff.on_exception(backoff.expo, ApiException, max_tries=20, giveup=fatal_code)
     def _delete_ql(self, ws, ql):
         rs = self._rs_client()
         try:

@@ -53,6 +53,61 @@ where num <= :exclude
 ql_name = "dbt_ql"
 
 
+NUM_QLS = 35
+
+
+class TestQueryLambdaRateLimitingRockset(BaseAdapterMethod):
+    # Creates many QLs to ensure they eventually get created even when encountering rate limiting
+    @pytest.fixture(scope="class")
+    def models(self):
+        models = {
+            "base.sql": models__base_sql,
+        }
+
+        for i in range(NUM_QLS):
+            ql_model = (
+                """
+            {{ config(
+                    materialized="query_lambda",
+            """
+                + f'tags=["{str(i)}"],'
+                + """
+                    parameters=[
+                        {'name': 'mul', 'value': '7', 'type': 'int' },
+                        {'name': 'exclude', 'value': '1', 'type': 'int' },
+                        ],
+                    )}}
+            select num * :mul as result
+            from {{ ref('base') }}
+            where num <= :exclude
+            """
+            )
+            models[f"{str(i)}_ql.sql"] = ql_model
+        return models
+
+    def test_adapter_methods(self, project, equal_tables):
+        run_dbt(["compile"])  # trigger any compile-time issues
+        result = run_dbt()
+        workspace = result.results[0].node.schema
+        rs = RocksetClient(api_key=os.getenv("API_KEY"), host=os.getenv("API_SERVER"))
+        # Ensure all the QLs are visible
+        for i in range(NUM_QLS):
+            ql_name = f"{str(i)}_ql"
+            ql_tag = str(i)
+            ql_retrieved = False
+            for retry in range(5):
+                try:
+                    resp = rs.QueryLambdas.get_query_lambda_tag_version(
+                        query_lambda=ql_name, workspace=workspace, tag=ql_tag
+                    )
+                    ql_retrieved = True
+                    break
+                except ApiException as e:
+                    print("Couldn't get ql " + ql_name + " : " + str(e))
+                time.sleep(retry)
+            assert ql_retrieved, f"{ql_name} was not visible"
+
+
 class TestQueryLambdaCreationRockset(BaseAdapterMethod):
     @pytest.fixture(scope="class")
     def models(self):
