@@ -70,7 +70,7 @@ pytimeparse==1.1.8
 pytz==2023.3.post1
 PyYAML==6.0.1
 referencing==0.30.2
-requests==2.31.0
+requests==2.32.0
 rich==13.7.0
 rockset==2.1.0
 rockset-sqlalchemy==0.0.1
